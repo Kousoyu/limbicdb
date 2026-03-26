@@ -1,0 +1,62 @@
+{
+  "name": "limbicdb",
+  "version": "0.1.0",
+  "description": "Embedded cognitive memory database for AI agents. Like SQLite, but for agent memory with cognitive science principles.",
+  "keywords": [
+    "ai",
+    "agent",
+    "memory",
+    "llm",
+    "embedded-database",
+    "cognitive",
+    "sqlite",
+    "vector-search",
+    "forgetting-curve",
+    "limbic",
+    "memory-decay",
+    "cognitive-primitives"
+  ],
+  "author": "Kousoyu",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Kousoyu/limbicdb"
+  },
+  "type": "module",
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.mjs",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": "./dist/index.mjs",
+      "require": "./dist/index.cjs",
+      "types": "./dist/index.d.ts"
+    }
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "build": "tsup src/index.ts --format cjs,esm --dts --clean",
+    "dev": "tsup src/index.ts --format esm --watch",
+    "demo": "tsx demo.ts",
+    "verify": "node scripts/verify.js",
+    "typecheck": "tsc --noEmit",
+    "prepublishOnly": "npm run build && npm run verify"
+  },
+  "dependencies": {
+    "better-sqlite3": "^11.0.0"
+  },
+  "devDependencies": {
+    "@types/better-sqlite3": "^7.6.8",
+    "@types/node": "^20.0.0",
+    "tsup": "^8.0.0",
+    "typescript": "^5.4.0",
+    "tsx": "^4.7.0"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}
