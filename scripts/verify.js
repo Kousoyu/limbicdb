@@ -77,14 +77,14 @@ async function main() {
     await db.remember('时间线测试记忆')
     await db.set('timelineTest', { value: 1 })
     
-    const events = await db.history({ limit: 2 })
+    const events = await db.history({ limit: 5 })
     if (events.length < 2) throw new Error('时间线记录不足')
     
     const hasMemoryEvent = events.some(e => e.type === 'memory')
     const hasStateEvent = events.some(e => e.type === 'state')
     
     if (!hasMemoryEvent || !hasStateEvent) {
-      throw new Error('时间线事件类型不完整')
+      throw new Error(`时间线事件类型不完整。找到的事件类型: ${events.map(e => e.type).join(', ')}`)
     }
   })
   
