@@ -9,7 +9,7 @@
  */
 
 import Database from 'better-sqlite3'
-import type { IStorage, SearchQuery, EventQuery, SnapshotData } from './interface'
+import type { IStorage, SearchQuery, EventQuery, SnapshotData, EmbeddingRow } from './interface'
 import type {
   Memory,
   MemoryKind,
@@ -227,7 +227,9 @@ export class SQLiteStore implements IStorage {
         (SELECT COUNT(*) FROM memories WHERE is_deleted = 0) as memory_count,
         (SELECT COUNT(*) FROM state) as state_key_count,
         (SELECT COUNT(*) FROM snapshots) as snapshot_count,
-        (SELECT page_count * page_size FROM pragma_page_count, pragma_page_size) as db_size_bytes
+        (SELECT page_count * page_size FROM pragma_page_count, pragma_page_size) as db_size_bytes,
+        (SELECT COUNT(*) FROM memory_embeddings) as embeddings_count,
+        (SELECT dimensions FROM memory_embeddings LIMIT 1) as embeddings_dimensions
     `)
   }
   
@@ -621,15 +623,27 @@ export class SQLiteStore implements IStorage {
     stateKeyCount: number
     snapshotCount: number
     dbSizeBytes: number
+    embeddingsCount?: number
+    embeddingsDimensions?: number
   }> {
     const stmt = this.getStatement('getStats')
     const row = stmt.get() as any
-    return {
+    const stats = {
       memoryCount: row.memory_count || 0,
       stateKeyCount: row.state_key_count || 0,
       snapshotCount: row.snapshot_count || 0,
       dbSizeBytes: row.db_size_bytes || 0
+    } as any
+    
+    // Only include embeddings stats if they exist
+    if (row.embeddings_count !== null) {
+      stats.embeddingsCount = row.embeddings_count || 0
     }
+    if (row.embeddings_dimensions !== null) {
+      stats.embeddingsDimensions = row.embeddings_dimensions
+    }
+    
+    return stats
   }
   
   // --- Lifecycle ---
@@ -645,6 +659,7 @@ export class SQLiteStore implements IStorage {
       this.db.exec('DELETE FROM memories_fts')
       this.db.exec('DELETE FROM state')
       this.db.exec('DELETE FROM timeline')
+      this.db.exec('DELETE FROM memory_embeddings')
       
       // Restore memories
       for (const [_id, memory] of snapshotData.memories) {
@@ -701,6 +716,27 @@ export class SQLiteStore implements IStorage {
           event.content || null,
           event.timestamp
         )
+      }
+      
+      // Restore embeddings if they exist
+      if (snapshotData.embeddings) {
+        for (const [_memoryId, embeddingRow] of snapshotData.embeddings) {
+          const row = embeddingRow as EmbeddingRow
+          // Serialize vector to BLOB
+          const f32 = new Float32Array(row.vector)
+          const vectorBlob = Buffer.from(f32.buffer)
+          
+          const embedStmt = this.db.prepare(`
+            INSERT INTO memory_embeddings (memory_id, vector, dimensions, model_hint)
+            VALUES (?, ?, ?, ?)
+          `)
+          embedStmt.run(
+            row.memoryId,
+            vectorBlob,
+            row.dimensions,
+            row.modelHint
+          )
+        }
       }
     })
   }

@@ -9,7 +9,7 @@ Store what matters, recall it with context, and inspect why it was used — in a
 > **Current Status (v0.4.0-alpha.1)**: 
 > - **SQLite backend**: Stable keyword search, experimental semantic/hybrid search MVP
 > - **Memory backend**: Experimental semantic/hybrid search prototype
-> - **Snapshot parity**: Embeddings not yet included in SQLite snapshots
+> - **Snapshot parity**: Embeddings now included in SQLite snapshots (MVP)
 
 ## Backend Capability Matrix
 
@@ -19,7 +19,7 @@ Store what matters, recall it with context, and inspect why it was used — in a
 | **Semantic search** | 🧪 Experimental (MVP) | ✅ Experimental (bring-your-own embedder) |
 | **Hybrid search** | 🧪 Experimental (MVP) | ✅ Experimental (70% semantic, 30% keyword) |
 | **Persistent storage** | ✅ Single `.limbic` file | ❌ Volatile (in-memory only) |
-| **Snapshot/Restore** | ✅ (without embeddings) | ✅ (with embeddings) |
+| **Snapshot/Restore** | ✅ (with embeddings) | ✅ (with embeddings) |
 | **File-based** | ✅ | ❌ |
 
 ## Quick Start (Choose Your Path)
@@ -103,8 +103,8 @@ LimbicDB v0.4.0-alpha.1 has these current limitations:
 * **Memory format stability**  
   The `.limbic` file format may change between alpha releases.
 
-* **Snapshot parity incomplete**  
-  SQLite snapshots don't yet include embeddings; memory backend snapshots do.
+* **Snapshot parity now complete**  
+  SQLite snapshots now include embeddings (MVP).
 
 These limitations are documented for transparency. Future releases will address them based on user feedback.
 
@@ -136,7 +136,7 @@ Please open an issue using the built-in templates.
 * 🔄 **Embedding storage** - basic integration complete
 * 🧪 **Semantic search** - experimental MVP implementation
 * 🧪 **Hybrid search** - experimental MVP implementation
-* 🔄 **Snapshot parity** - embeddings not yet included in snapshots
+* ✅ **Snapshot parity** - embeddings now included in snapshots
 
 ### Memory Backend (`open(':memory:')`)
 **Current (stable)**:

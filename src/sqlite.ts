@@ -6,7 +6,7 @@
  */
 
 import { SQLiteStore } from './storage/sqlite-store'
-import { EmbeddingStore, cosineSimilarity } from './embedding-store'
+import { EmbeddingStore, cosineSimilarity, type EmbeddingRow } from './embedding-store'
 import type {
   LimbicDB,
   LimbicDBConfig,
@@ -772,10 +772,19 @@ export class LimbicDBSQLite implements LimbicDB {
     
     const timeline = await this.store.getEvents({ limit: 10000 })
     
+    // Get embeddings if available
+    let embeddings: Array<[string, EmbeddingRow]> | undefined
+    if (this._embeddingStore) {
+      await this.ensureEmbeddingStoreInitialized()
+      const embeddingRows = await this._embeddingStore.getAll()
+      embeddings = embeddingRows.map(row => [row.memoryId, row] as [string, EmbeddingRow])
+    }
+    
     const snapshotData = {
       memories: memories.map(mem => [mem.id, mem] as [string, Memory]),
       state,
       timeline,
+      embeddings,
       createdAt: now
     }
     
@@ -828,12 +837,22 @@ export class LimbicDBSQLite implements LimbicDB {
   // Helper method to get actual stats (async)
   async getStats(): Promise<LimbicDBStats> {
     const storeStats = await this.store.getStats()
-    return {
+    const stats: LimbicDBStats = {
       memoryCount: storeStats.memoryCount,
       stateKeyCount: storeStats.stateKeyCount,
       snapshotCount: storeStats.snapshotCount,
       dbSizeBytes: storeStats.dbSizeBytes
     }
+    
+    // Include embedding statistics if available
+    if (storeStats.embeddingsCount !== undefined) {
+      stats.embeddingsCount = storeStats.embeddingsCount
+    }
+    if (storeStats.embeddingsDimensions !== undefined) {
+      stats.embeddingsDimensions = storeStats.embeddingsDimensions
+    }
+    
+    return stats
   }
 }
 
