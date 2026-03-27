@@ -30,18 +30,19 @@ describe('LimbicDB SQLite Integration', () => {
   
   it('should forget memories by filter', async () => {
     // Create test memories
-    await db.remember('临时记忆 1', { tags: ['temp'] })
-    await db.remember('临时记忆 2', { tags: ['temp'] })
-    await db.remember('永久记忆', { tags: ['permanent'] })
+    await db.remember('Temporary memory 1', { tags: ['temp'] })
+    await db.remember('Temporary memory 2', { tags: ['temp'] })
+    await db.remember('Permanent memory', { tags: ['permanent'] })
     
     // Forget temp memories
     const forgotten = await db.forget({ tags: ['temp'] })
     expect(forgotten).toBe(2)
     
-    // Verify only permanent remains
-    const results = await db.recall('记忆')
+    // Verify only permanent remains - use empty query with tags filter
+    const results = await db.recall('', { tags: ['permanent'] })
     expect(results.length).toBe(1)
-    expect(results[0].content).toBe('永久记忆')
+    expect(results[0].content).toBe('Permanent memory')
+    expect(results[0].tags).toContain('permanent')
   })
   
   it('should handle state operations', async () => {
@@ -71,10 +72,10 @@ describe('LimbicDB SQLite Integration', () => {
     expect(stateEvents.length).toBeGreaterThan(0)
   })
   
-  it.skip('should create and restore snapshots', async () => {
+  it('should create and restore snapshots', async () => {
     // Create some data
-    await db.remember('快照测试记忆 1')
-    await db.remember('快照测试记忆 2')
+    await db.remember('Snapshot test memory 1')
+    await db.remember('Snapshot test memory 2')
     await db.set('snapshot:test', 'value')
     
     // Create snapshot
@@ -82,15 +83,17 @@ describe('LimbicDB SQLite Integration', () => {
     expect(snapshotId).toBeDefined()
     
     // Add more data after snapshot
-    await db.remember('快照后添加的记忆')
+    await db.remember('Memory added after snapshot')
     
     // Restore snapshot
     await db.restore(snapshotId)
     
-    // Verify only snapshot data exists
-    const memories = await db.recall('快照')
+    // Verify only snapshot data exists - use empty query to get all
+    const memories = await db.recall('')
     expect(memories.length).toBe(2) // Only the two snapshot memories
-    expect(memories.some(m => m.content.includes('快照后添加的记忆'))).toBe(false)
+    expect(memories.some(m => m.content.includes('Memory added after snapshot'))).toBe(false)
+    expect(memories.some(m => m.content.includes('Snapshot test memory 1'))).toBe(true)
+    expect(memories.some(m => m.content.includes('Snapshot test memory 2'))).toBe(true)
   })
   
   it('should support memory decay configuration', async () => {

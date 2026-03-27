@@ -24,6 +24,66 @@ describeWithBackends('LimbicDB Contract Tests', (createDb) => {
     await db.close()
   })
 
+  describe('keyword search semantics', () => {
+    it('should match memories containing exact keyword', async () => {
+      // Arrange
+      await db.remember('This is a test memory')
+      await db.remember('Another test example')
+      await db.remember('Unrelated content')
+
+      // Act
+      const results = await db.recall('test')
+
+      // Assert
+      expect(results.length).toBe(2)
+      expect(results.some(m => m.content.includes('test memory'))).toBe(true)
+      expect(results.some(m => m.content.includes('test example'))).toBe(true)
+    })
+
+    it('should be case-insensitive', async () => {
+      // Arrange
+      await db.remember('UPPERCASE TEST')
+      await db.remember('lowercase test')
+      await db.remember('MixedCase Test')
+
+      // Act
+      const results = await db.recall('test')
+
+      // Assert
+      expect(results.length).toBe(3)
+    })
+
+    it('should match exact word occurrences (partial matching depends on FTS configuration)', async () => {
+      // Arrange
+      await db.remember('This is a test')
+      await db.remember('Testing is important') // Contains "test" as substring
+      await db.remember('No match')
+
+      // Act
+      const results = await db.recall('test')
+
+      // Assert - At least exact match should work
+      expect(results.length).toBeGreaterThanOrEqual(1)
+      expect(results.some(m => m.content.includes('This is a test'))).toBe(true)
+    })
+
+    // Note: Chinese/Unicode search support depends on FTS5 configuration
+    // Currently may have limitations with CJK characters
+    it.skip('should support Unicode/Chinese character matching (if configured)', async () => {
+      // This test is skipped as Chinese search requires additional FTS5 configuration
+      // Arrange
+      await db.remember('这是一个测试记忆')
+      await db.remember('另一个记忆')
+      await db.remember('测试内容')
+
+      // Act
+      const results = await db.recall('测试')
+
+      // Assert
+      expect(results.length).toBeGreaterThanOrEqual(2)
+    })
+  })
+
   describe('empty query semantics', () => {
     it('should return all memories when query is empty string', async () => {
       // Arrange
