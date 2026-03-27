@@ -416,6 +416,22 @@ See the full example: [`examples/semantic-recall.ts`](examples/semantic-recall.t
 For a complete example with durable file storage and snapshots, see:
 [`examples/durable-semantic-snapshot.ts`](examples/durable-semantic-snapshot.ts)
 
+## Performance Baseline
+
+A performance benchmarking tool is available to measure search performance across different modes and memory scales:
+
+```bash
+npx tsx benchmarks/search-benchmark.ts
+```
+
+The benchmark measures:
+- **Keyword search**: SQLite FTS5 performance
+- **Semantic search**: Brute-force cosine similarity scaling
+- **Hybrid search**: Combined scoring performance
+- **Embedding computation**: Async embedding throughput
+
+**Note**: This is an internal benchmarking tool for development and comparison. Results are baselines only, not production metrics.
+
 ## License
 
 MIT
