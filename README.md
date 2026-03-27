@@ -112,9 +112,9 @@ Cleanly close the database.
 
 ---
 
-## Memory Types
+## Memory Classification
 
-LimbicDB automatically classifies memories into cognitive types:
+LimbicDB automatically classifies memories into semantic types:
 
 | Kind | Description | Example |
 |------|-------------|---------|
@@ -170,7 +170,7 @@ LimbicDB is built around a simple but powerful core:
 3. **Local-First Design**
    - Single file format (`.limbic` SQLite database)
    - No external dependencies by default
-   - Optional semantic search via pluggable embedders
+   - Pluggable search enhancements when needed
 
 ## Getting Started
 
@@ -224,4 +224,4 @@ MIT
 
 ---
 
-*Inspired by principles of memory retention and retrieval from cognitive science, but focused on practical engineering for embedded agents.*
+*Built for embedded agents that need durable, inspectable memory without server dependencies.*
