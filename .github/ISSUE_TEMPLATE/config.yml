@@ -1,0 +1,5 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Alpha usage discussion
+    url: https://github.com/Kousoyu/limbicdb/discussions
+    about: Share usage stories, general questions, and early alpha feedback here.

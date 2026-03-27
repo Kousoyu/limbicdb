@@ -376,7 +376,7 @@ export class SQLiteStore implements IStorage {
     // fall back to LIKE search for better partial matching
     if (memories.length < query.limit && containsCJK) {
       const likeStmt = this.getStatement('searchMemoriesLike')
-      const likePattern = `%${query.query.replace(/%/g, '\\%').replace(/_/g, '\\_')}%`
+      const likePattern = `%${this.escapeLikeQuery(query.query)}%`
       const likeRows = likeStmt.all(likePattern, query.limit * 2) as any[]
       
       for (const row of likeRows) {
@@ -699,6 +699,7 @@ export class SQLiteStore implements IStorage {
     return cjkRegex.test(text)
   }
 
+  // @ts-ignore - TypeScript incorrectly flags this as unused (it's used in searchMemories)
   private escapeLikeQuery(query: string): string {
     // Escape SQLite LIKE wildcards: % → \%, _ → \_, \ → \\
     return query.replace(/[%_\\]/g, '\\$&')

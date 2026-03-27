@@ -80,6 +80,19 @@ LimbicDB 0.3.0-alpha is focused on establishing reliable foundations. Current li
 
 These limitations are documented for transparency. Future releases will address them based on user feedback.
 
+## Feedback
+
+LimbicDB is still in alpha.
+
+If you try it, the most helpful feedback is:
+- install/setup problems
+- recall behavior that feels surprising
+- backend differences between memory and SQLite
+- CJK / Chinese search issues
+- places where the README feels stronger than the real product
+
+Please open an issue using the built-in templates.
+
 ## Roadmap Direction
 
 LimbicDB is evolving toward a reliable memory runtime with:

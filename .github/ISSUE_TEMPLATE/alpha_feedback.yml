@@ -1,0 +1,100 @@
+name: Alpha feedback
+description: Report bugs, share feedback, or describe installation problems for LimbicDB alpha
+title: "[Feedback]: "
+labels:
+  - alpha
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for trying LimbicDB alpha.
+
+        This template is for:
+        - Bug reports
+        - Installation / setup issues  
+        - Usage feedback
+        - API confusion or surprises
+
+        Please provide enough detail for us to understand and reproduce the issue.
+
+        感谢试用 LimbicDB alpha。
+
+        这个模板适合：
+        - 报错
+        - 安装/接入问题
+        - 使用反馈
+        - API 让人困惑或意外的地方
+
+        请提供足够的细节，让我们能理解和复现问题。
+
+  - type: input
+    id: version
+    attributes:
+      label: LimbicDB version
+      placeholder: "e.g. 0.3.0-alpha.2"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: backend
+    attributes:
+      label: Backend used
+      options:
+        - memory
+        - sqlite
+        - both
+        - not sure
+    validations:
+      required: true
+
+  - type: dropdown
+    id: issue_type
+    attributes:
+      label: Type of feedback
+      options:
+        - Bug / error
+        - Installation / setup problem
+        - API confusion or surprise
+        - Search behavior issue (CJK / Chinese)
+        - Performance or stability
+        - Documentation mismatch
+        - General feedback
+    validations:
+      required: true
+
+  - type: textarea
+    id: what_happened
+    attributes:
+      label: What happened?
+      description: Describe the issue or your experience clearly.
+      placeholder: |
+        For bugs: what did you do, what happened, what did you expect?
+        For feedback: what worked, what felt weak, what confused you?
+      validations:
+        required: true
+
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Minimal reproduction (for bugs)
+      description: If reporting a bug, paste the smallest script that reproduces the issue.
+      placeholder: |
+        import { open } from 'limbicdb'
+        // ...
+      render: typescript
+
+  - type: textarea
+    id: environment
+    attributes:
+      label: Environment details
+      description: Node version, OS, package manager, module system (ESM/CJS)
+      placeholder: |
+        Node 20.11.1, macOS 15, npm, ESM
+      validations:
+        required: true
+
+  - type: textarea
+    id: additional
+    attributes:
+      label: Additional context
+      description: Anything else that might help us understand the issue.
