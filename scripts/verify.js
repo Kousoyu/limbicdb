@@ -55,10 +55,10 @@ async function main() {
     await db.remember('项目使用TypeScript开发')
     await db.remember('用户偏好Python')
     
-    const results = await db.recall('TypeScript')
-    if (results.length === 0) throw new Error('未检索到相关记忆')
+    const result = await db.recall('TypeScript')
+    if (result.memories.length === 0) throw new Error('未检索到相关记忆')
     
-    const hasMatch = results.some(mem => mem.content.includes('TypeScript'))
+    const hasMatch = result.memories.some(mem => mem.content.includes('TypeScript'))
     if (!hasMatch) throw new Error('检索结果不包含关键词')
   })
   
