@@ -1,6 +1,6 @@
 {
   "name": "limbicdb",
-  "version": "0.4.0-alpha.1",
+  "version": "0.4.0-alpha.3",
   "description": "Local-first memory engine for embedded agents. Durable, inspectable, and one-file by default.",
   "keywords": [
     "ai",
@@ -41,7 +41,11 @@
     "demo": "tsx demo.ts",
     "verify": "node scripts/verify.js",
     "typecheck": "tsc --noEmit",
-    "prepublishOnly": "npm run build && npm run verify"
+    "test": "vitest run",
+    "benchmark": "tsx benchmarks/search-benchmark.ts",
+    "benchmark:baseline": "tsx benchmarks/performance-baseline.ts",
+    "smoketest": "npm run typecheck && npm run test && npm run build && npm pack --dry-run",
+    "prepublishOnly": "npm run build && npm run verify && npm run smoketest"
   },
   "dependencies": {
     "better-sqlite3": "^11.0.0"

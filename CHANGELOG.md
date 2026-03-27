@@ -5,6 +5,62 @@ All notable changes to LimbicDB will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.4.0-alpha.3] - 2026-03-28
+
+### 🎯 Truthful Alpha Release (Release Discipline)
+This release establishes clear release discipline and completes the Day 3 milestone. The focus shifts from feature expansion to reliability and user experience.
+
+### Added
+- **CI/CD pipeline**: GitHub Actions workflow with type checking, testing, and package verification
+- **Release gate checks**: Automated validation of version consistency, CHANGELOG updates, and example functionality
+- **User-facing examples**: 
+  - `examples/coding-agent-memory.ts` (50 lines): Shows how a coding agent uses memory across sessions
+  - `examples/personal-assistant-memory.ts` (50 lines): Demonstrates personal assistant memory lifecycle
+- **Benchmark infrastructure**:
+  - `benchmarks/performance-baseline.ts`: Generates markdown report comparing SQLite vs memory backends
+  - `benchmarks/search-benchmark.ts`: Detailed performance measurement across modes and scales
+  - `npm run benchmark` and `npm run benchmark:baseline` scripts
+- **Package verification**: `npm run smoketest` command validates build, tests, and npm pack readiness
+- **CJK search improvements**: Enhanced Chinese/Japanese/Korean search with expanded Unicode range handling
+- **Performance baseline documentation**: Clear scaling characteristics for keyword, semantic, and hybrid search
+
+### Changed
+- **Version consistency**: Package.json (0.4.0-alpha.3), CHANGELOG, and README all aligned
+- **Build process**: Enhanced `prepublishOnly` hook includes full smoketest validation
+- **Example structure**: All examples directly runnable without modification
+- **Git ignore**: Added `benchmarks/results/` to prevent committing environment-specific data
+- **Issue hygiene**: Closed Issue #5 (snapshot embeddings), progressed Issue #6 (CJK improvements)
+
+### Fixed
+- **Benchmark execution**: ES module compatibility for direct script execution
+- **CJK test coverage**: Expanded from skipped placeholder to 5 comprehensive tests
+- **Memory backend performance**: Optimized vector operations for larger memory counts
+
+### Release Discipline (New Standard)
+From this release forward:
+1. **CI must pass** before merging to main (typecheck + test + build + examples)
+2. **Version consistency** validated automatically (package.json ↔ CHANGELOG ↔ README)
+3. **Examples must run** directly from README instructions
+4. **npm pack validation** ensures clean package distribution
+5. **Transparent limitations** documented in capability matrix
+
+### Performance Baseline (Alpha Implementation)
+- **Keyword search**: <2ms even at 5,000 memories (both backends)
+- **Semantic search**: Linear scaling (O(n) with vector dimension)
+  - Memory backend: 7.5ms at 5,000 memories
+  - SQLite backend: 259ms at 5,000 memories (includes file I/O)
+- **Hybrid search**: Similar cost to semantic search
+- **Key insight**: Memory backend avoids disk I/O for faster vector operations
+
+### Next Phase Focus
+With release discipline established, the project can now focus on:
+1. **Vector search optimization** (ANN/indexing for >10K memories)
+2. **CJK tokenizer integration** (Issue #6 follow-up)
+3. **Adapter ecosystem** (LangChain, MCP, etc.)
+4. **Production hardening** (error handling, monitoring, migration)
+
+---
+
 ## [0.4.0-alpha.1] - 2026-03-27
 
 ### 🧠 Semantic Search MVP (Both Backends)

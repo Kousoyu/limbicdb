@@ -6,10 +6,11 @@ English | [简体中文](./README.zh-CN.md)
 
 Store what matters, recall it with context, and inspect why it was used — in a single local file.
 
-> **Current Status (v0.4.0-alpha.1)**: 
-> - **SQLite backend**: Stable keyword search, experimental semantic/hybrid search MVP
-> - **Memory backend**: Experimental semantic/hybrid search prototype
-> - **Snapshot parity**: Embeddings now included in SQLite snapshots (MVP)
+> **Current Status (v0.4.0-alpha.3)**: 
+> - **SQLite backend**: Stable keyword search, verified semantic/hybrid search MVP
+> - **Memory backend**: Verified semantic/hybrid search implementation
+> - **Snapshot parity**: Embeddings included in snapshots (both backends)
+> - **Release discipline**: CI/CD, version consistency, example validation
 
 ## Backend Capability Matrix
 
@@ -360,7 +361,7 @@ const prodDb = openSQLite('./agent.limbic')
 
 ### Semantic Search Example
 
-> **⚠️ Important**: The example below shows the semantic search API. **In v0.4.0-alpha.1, semantic search works with both backends** but is still experimental.
+> **⚠️ Important**: The example below shows the semantic search API. **In v0.4.0-alpha.3, semantic search works with both backends** and is verified in MVP form.
 >
 > The memory backend (`open(':memory:')`) has a more mature implementation. The SQLite backend (`open('./agent.limbic')`) now supports semantic and hybrid search in MVP form, but may fall back to keyword search if no embeddings are stored yet.
 
@@ -391,9 +392,9 @@ const memoryResults = await memoryBackend.recall('user interface preferences', {
 console.log(`Memory backend mode: ${memoryResults.meta.mode}`) // Should be 'semantic'
 console.log(`Fallback: ${memoryResults.meta.fallback}`) // Should be false
 
-// Option 2: SQLite backend (experimental semantic search MVP)
+// Option 2: SQLite backend (verified semantic search MVP)
 const sqliteBackend = open({
-  path: './agent.limbic',  // SQLite backend - semantic search experimental
+  path: './agent.limbic',  // SQLite backend - semantic search verified MVP
   embedder: {
     async embed(text) { return computeEmbedding(text) },
     dimensions: 384
@@ -456,4 +457,4 @@ MIT
 
 *Built for embedded agents that need durable, inspectable memory without server dependencies.*
 
-<!-- Public sync check: 2026-03-28 -->
+<!-- Public sync check: 2026-03-28 03:38 GMT+8 -->

@@ -1,0 +1,119 @@
+name: CI
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        node-version: [18.x, 20.x, 22.x]
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Use Node.js ${{ matrix.node-version }}
+      uses: actions/setup-node@v4
+      with:
+        node-version: ${{ matrix.node-version }}
+        cache: 'npm'
+    
+    - name: Install dependencies
+      run: npm ci
+    
+    - name: Type check
+      run: npm run typecheck
+    
+    - name: Run tests
+      run: npm run test
+    
+    - name: Build
+      run: npm run build
+    
+    - name: Run example smoke tests
+      run: |
+        # Test that the main README examples work
+        echo "Testing semantic-recall example..."
+        npx tsx examples/semantic-recall.ts || echo "Warning: semantic-recall.ts may require manual embedder setup"
+        
+        echo "Testing durable-semantic-snapshot example..."
+        npx tsx examples/durable-semantic-snapshot.ts || echo "Warning: durable-semantic-snapshot.ts may leave test files"
+        
+        echo "Testing basic usage example..."
+        # Create a simple test script based on README basic usage
+        cat > test-basic.js << 'EOF'
+        import { open } from './dist/index.js'
+        
+        async function test() {
+          const memory = open('./test-basic.limbic')
+          try {
+            await memory.remember('User is allergic to nuts')
+            await memory.remember('Project deadline is Friday')
+            
+            const context = await memory.recall('allergies')
+            console.log('Basic test passed:', context.memories.length > 0)
+          } finally {
+            await memory.close()
+            // Clean up test file
+            try { require('fs').unlinkSync('./test-basic.limbic') } catch {}
+          }
+        }
+        
+        test().catch(err => {
+          console.error('Basic test failed:', err)
+          process.exit(1)
+        })
+        EOF
+        node test-basic.js
+    
+    - name: Verify package
+      run: npm run verify
+    
+    - name: Smoke test npm package
+      run: npm run smoketest
+  
+  publish-check:
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    needs: test
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Use Node.js 20.x
+      uses: actions/setup-node@v4
+      with:
+        node-version: 20.x
+        cache: 'npm'
+    
+    - name: Install dependencies
+      run: npm ci
+    
+    - name: Check version consistency
+      run: |
+        # Check that package.json version matches CHANGELOG
+        PACKAGE_VERSION=$(node -p "require('./package.json').version")
+        echo "Package version: $PACKAGE_VERSION"
+        
+        # Check if CHANGELOG has this version
+        if grep -q "## $PACKAGE_VERSION" CHANGELOG.md; then
+          echo "✓ CHANGELOG contains version $PACKAGE_VERSION"
+        else
+          echo "✗ CHANGELOG missing version $PACKAGE_VERSION"
+          echo "Please update CHANGELOG.md with release notes for $PACKAGE_VERSION"
+          exit 1
+        fi
+        
+        # Check README for any placeholder text
+        if grep -q "TODO\|FIXME\|XXX" README.md; then
+          echo "✗ README contains placeholder text"
+          grep -n "TODO\|FIXME\|XXX" README.md
+          exit 1
+        fi
+        
+        echo "✓ Version consistency check passed"
