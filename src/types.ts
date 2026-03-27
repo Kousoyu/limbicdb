@@ -60,7 +60,9 @@ export interface RecallOptions {
 export interface RecallResult {
   memories: Memory[]
   meta: {
-    mode: RecallMode
+    requestedMode: RecallMode // What the user requested
+    executedMode: RecallMode // What actually ran
+    mode: RecallMode // Alias for executedMode (backward compatibility)
     fallback: boolean // true if requested semantic/hybrid but fell back to keyword
     pendingEmbeddings?: number // number of memories still waiting for embedding computation
     timing: {

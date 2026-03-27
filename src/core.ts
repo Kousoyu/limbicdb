@@ -234,22 +234,22 @@ export class LimbicDBImpl implements LimbicDB {
   
   async recall(query: string, options?: RecallOptions): Promise<RecallResult> {
     const startTime = Date.now()
-    const mode = options?.mode || 'keyword'
+    const requestedMode = options?.mode || 'keyword'
     
     // Determine actual mode based on embedder availability
-    const actualMode: RecallMode = this.determineActualMode(mode)
-    const fallback = (mode === 'semantic' || mode === 'hybrid') && actualMode === 'keyword'
+    const executedMode: RecallMode = this.determineActualMode(requestedMode)
+    const fallback = (requestedMode === 'semantic' || requestedMode === 'hybrid') && executedMode === 'keyword'
     
     let memories: Memory[] = []
     let embedMs = 0
     
-    if (actualMode === 'keyword') {
+    if (executedMode === 'keyword') {
       memories = await this.executeKeywordRecall(query, options)
-    } else if (actualMode === 'semantic') {
+    } else if (executedMode === 'semantic') {
       const result = await this.executeSemanticRecall(query, options)
       memories = result.memories
       embedMs = result.embedMs
-    } else if (actualMode === 'hybrid') {
+    } else if (executedMode === 'hybrid') {
       const result = await this.executeHybridRecall(query, options)
       memories = result.memories
       embedMs = result.embedMs
@@ -258,12 +258,14 @@ export class LimbicDBImpl implements LimbicDB {
     const searchMs = Date.now() - startTime
     
     // Record access event
-    this.recordTimelineEvent('memory', 'access', undefined, `Recalled: "${query.substring(0, 50)}" (${actualMode})`)
+    this.recordTimelineEvent('memory', 'access', undefined, `Recalled: "${query.substring(0, 50)}" (${executedMode})`)
     
     return {
       memories,
       meta: {
-        mode: actualMode,
+        requestedMode,
+        executedMode,
+        mode: executedMode, // Alias for backward compatibility
         fallback,
         pendingEmbeddings: this.pendingEmbeddings,
         timing: {

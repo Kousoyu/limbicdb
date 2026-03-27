@@ -220,30 +220,32 @@ export class LimbicDBSQLite implements LimbicDB {
     const now = startTime
     const limit = options?.limit || 10
     const minStrength = options?.minStrength || 0.01
-    const mode = options?.mode || 'keyword'
+    const requestedMode = options?.mode || 'keyword'
     
-    // Determine actual mode based on embedder availability
-    const actualMode: RecallMode = this.determineActualMode(mode)
-    const fallback = (mode === 'semantic' || mode === 'hybrid') && actualMode === 'keyword'
+    // Determine what mode would be executed
+    // In SQLite backend, semantic/hybrid are not yet implemented, so always execute keyword
+    const executedMode: RecallMode = 'keyword'
+    const fallback = (requestedMode === 'semantic' || requestedMode === 'hybrid') && executedMode === 'keyword'
+    
+    // Log warning if user requested semantic/hybrid but we're falling back
+    if (fallback) {
+      console.warn('[limbicdb] SQLite backend: semantic/hybrid search not yet implemented, falling back to keyword')
+    }
     
     let memories: Memory[] = []
     let embedMs = 0
     
-    if (actualMode === 'keyword') {
-      memories = await this.executeKeywordRecall(query, options, startTime)
-    } else {
-      // For now, semantic and hybrid modes fall back to keyword in SQLite backend
-      // TODO: Implement proper semantic/hybrid search for SQLite
-      console.warn('[limbicdb] SQLite backend: semantic/hybrid search not yet implemented, falling back to keyword')
-      memories = await this.executeKeywordRecall(query, options, startTime)
-    }
+    // Always execute keyword recall for now
+    memories = await this.executeKeywordRecall(query, options, startTime)
     
     const searchMs = Date.now() - startTime
     
     return {
       memories,
       meta: {
-        mode: actualMode,
+        requestedMode,
+        executedMode,
+        mode: executedMode, // Alias for backward compatibility
         fallback,
         pendingEmbeddings: this._pendingEmbeddings,
         timing: {

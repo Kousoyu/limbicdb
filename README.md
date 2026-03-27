@@ -6,6 +6,58 @@ English | [简体中文](./README.zh-CN.md)
 
 Store what matters, recall it with context, and inspect why it was used — in a single local file.
 
+> **Current Status (v0.4.0-alpha.1)**: 
+> - **SQLite backend**: Stable keyword search, semantic search in progress
+> - **Memory backend**: Experimental semantic/hybrid search prototype
+> - **Snapshot parity**: Embeddings not yet included in SQLite snapshots
+
+## Backend Capability Matrix
+
+| Feature | SQLite Backend (`open('./agent.limbic')`) | Memory Backend (`open(':memory:')`) |
+|---------|-------------------------------------------|-------------------------------------|
+| **Keyword search** | ✅ Stable (FTS5 + LIKE fallback) | ✅ Stable |
+| **Semantic search** | 🔄 In progress (stores embeddings, search TODO) | ✅ Experimental (bring-your-own embedder) |
+| **Hybrid search** | 🔄 In progress | ✅ Experimental (70% semantic, 30% keyword) |
+| **Persistent storage** | ✅ Single `.limbic` file | ❌ Volatile (in-memory only) |
+| **Snapshot/Restore** | ✅ (without embeddings) | ✅ (with embeddings) |
+| **File-based** | ✅ | ❌ |
+
+## Quick Start (Choose Your Path)
+
+### Path 1: Durable Local File (SQLite Backend)
+```typescript
+import { open } from 'limbicdb'
+
+// Default path uses SQLite backend - durable, file-based
+const memory = open('./agent.limbic')
+
+await memory.remember('User prefers concise answers')
+await memory.remember('Project uses PostgreSQL')
+
+const results = await memory.recall('user preferences', { mode: 'keyword' })
+
+await memory.close()
+```
+
+### Path 2: Experimental Semantic Prototype (Memory Backend)
+```typescript
+import { open } from 'limbicdb'
+
+// ':memory:' path uses memory backend - supports semantic search
+const memory = open(':memory:')
+
+// To use semantic search, provide an embedder
+const memoryWithEmbedder = open({
+  path: ':memory:',
+  embedder: {
+    async embed(text) { /* your embedding function */ },
+    dimensions: 384
+  }
+})
+
+const results = await memoryWithEmbedder.recall('query', { mode: 'semantic' })
+```
+
 ## Why LimbicDB
 
 Most agent memory tools focus on storage or retrieval alone. LimbicDB is built around the full memory lifecycle:
@@ -17,36 +69,6 @@ Most agent memory tools focus on storage or retrieval alone. LimbicDB is built a
 - **Compact** noisy memory into cleaner long-lived state
 
 LimbicDB is designed for agents that need durable, inspectable memory without requiring a server, a hosted platform, or a heavyweight runtime.
-
-## What LimbicDB is
-
-- A **local-first** memory engine
-- A **one-file** durable store for agent memory
-- A **memory lifecycle** runtime: remember, recall, forget, inspect
-- A **pluggable** foundation for local and embedded agents
-
-## What LimbicDB is not
-
-- Not an agent runtime
-- Not a workflow orchestrator
-- Not a cloud memory platform
-- Not a graph database
-- Not a “human-brain simulator”
-
-## Quick Start
-
-```ts
-import { open } from 'limbicdb'
-
-const memory = open('./agent.limbic')
-
-await memory.remember('User prefers concise answers')
-await memory.remember('Project uses PostgreSQL')
-
-const results = await memory.recall('user preferences')
-
-await memory.close()
-```
 
 ## Core Principles
 
@@ -62,9 +84,12 @@ await memory.close()
 * **Model-agnostic**
  Useful without a specific model provider, with optional enhancements when available.
 
+* **Truthful about limitations**
+ We document what doesn't work as clearly as what does.
+
 ## Known Limitations (Alpha)
 
-LimbicDB 0.3.0-alpha is focused on establishing reliable foundations. Current limitations include:
+LimbicDB v0.4.0-alpha.1 has these current limitations:
 
 * **Chinese / CJK search support is limited**  
   FTS5 default configuration has limitations with CJK characters; search may not match partial words or characters within multi-character terms.
@@ -72,11 +97,14 @@ LimbicDB 0.3.0-alpha is focused on establishing reliable foundations. Current li
 * **Partial word matching not guaranteed**  
   Searching for "test" may not match "testing" or "tested" depending on exact FTS configuration.
 
-* **Current search is keyword-based, not semantic**  
-  `recall()` uses local text matching and ranking, not embedding-based semantic search.
+* **SQLite semantic/hybrid search in progress**  
+  The default `open('./agent.limbic')` path uses SQLite backend where semantic/hybrid search is not yet implemented (fallback to keyword).
 
 * **Memory format stability**  
   The `.limbic` file format may change between alpha releases.
+
+* **Snapshot parity incomplete**  
+  SQLite snapshots don't yet include embeddings; memory backend snapshots do.
 
 These limitations are documented for transparency. Future releases will address them based on user feedback.
 
@@ -87,39 +115,47 @@ LimbicDB is still in alpha.
 If you try it, the most helpful feedback is:
 - install/setup problems
 - recall behavior that feels surprising
-- backend differences between memory and SQLite
-- CJK / Chinese search issues
+- documentation mismatches with actual behavior
 - places where the README feels stronger than the real product
 
 Please open an issue using the built-in templates.
 
-## Current Status
+## Current Implementation Status
 
-To avoid confusion between what's implemented today and what's planned for the future, here's a clear breakdown:
+### SQLite Backend (`open('./agent.limbic')`)
+**Current (stable)**:
+* ✅ **One-file storage** - `.limbic` SQLite file format
+* ✅ **Keyword search** - FTS5 + LIKE fallback for English and basic CJK
+* ✅ **Memory lifecycle** - remember, recall, forget, inspect, history
+* ✅ **Auto-classification** - facts, episodes, preferences, procedures, goals
+* ✅ **State storage** - get/set for memory-adjacent state
+* ✅ **Timeline auditing** - full operation history
+* ✅ **Snapshots** - point-in-time restore (without embeddings)
 
-### Current (implemented and stable)
-* **One-file SQLite storage** - `.limbic` file format
-* **Dual backends** - Memory (fast, volatile) + SQLite (persistent)
-* **Contract-tested semantics** - 34 tests ensure memory and SQLite backends behave identically
-* **Keyword-based recall** - Local text matching and ranking
-* **Memory lifecycle** - remember, recall, forget, inspect, history
-* **Auto-classification** - facts, episodes, preferences, procedures, goals
+**In progress**:
+* 🔄 **Embedding storage** - basic integration complete
+* 🔄 **Semantic search** - vector storage implemented, search in progress
+* 🔄 **Hybrid search** - keyword + semantic combination in progress
+* 🔄 **Snapshot parity** - embeddings not yet included in snapshots
 
-### Experimental (improving, may change)
-* **CJK search enhancement** - Hybrid FTS5 + LIKE fallback for Chinese/Japanese/Korean text
-* **Inspectability depth** - Understanding why memories were recalled
-* **Compaction behavior** - Noise reduction and long-term memory consolidation
+### Memory Backend (`open(':memory:')`)
+**Current (stable)**:
+* ✅ **Keyword search** - local text matching
+* ✅ **Memory lifecycle** - full lifecycle operations
+* ✅ **Auto-classification** - same as SQLite backend
+* ✅ **State storage** - in-memory key-value
+* ✅ **Timeline auditing** - operation history
 
-### Experimental (improving, may change)
-* **Embedding / semantic recall** - Vector-based similarity search (bring-your-own embedder, v0.4 alpha)
-* **CJK search enhancement** - Hybrid FTS5 + LIKE fallback for Chinese/Japanese/Korean text
-* **Inspectability depth** - Understanding why memories were recalled
-* **Compaction behavior** - Noise reduction and long-term memory consolidation
+**Experimental (v0.4 alpha)**:
+* 🧪 **Semantic search** - vector-based similarity (bring-your-own embedder)
+* 🧪 **Hybrid search** - 70% semantic + 30% keyword weighting
+* 🧪 **Embedding integration** - async computation, final consistency model
+* 🧪 **Snapshot with embeddings** - embeddings included in snapshots
 
-### Planned (not yet implemented)
-* **Richer explanation APIs** - Deeper insights into memory decisions
-* **Stronger file format guarantees** - Stable `.limbic` format across versions
-* **Advanced retention policies** - Sophisticated decay and pruning strategies
+### Cross-Backend
+* ✅ **Contract testing** - 34 tests ensure memory and SQLite backends behave identically
+* ✅ **Unified API** - Same interface for both backends
+* ✅ **Error handling** - Graceful fallbacks when features unavailable
 
 ## Search Capability Matrix
 
@@ -135,7 +171,7 @@ To set clear expectations about what kind of search works today:
 
 **Status Key:**
 * ✅ **Stable** - Reliable, tested, ready for use
-* 🔄 **Improving** - Functional but actively being refined  
+* 🔄 **Improving** - Functional but actively being refined
 * 🧪 **Experimental** - Available but may have limitations
 * 📋 **Planned** - On the roadmap, not yet implemented
 
@@ -151,7 +187,7 @@ LimbicDB is evolving toward a reliable memory runtime with:
 
 ## How LimbicDB compares
 
-LimbicDB is not a vector database. It's a memory lifecycle engine. 
+LimbicDB is not a vector database. It's a memory lifecycle engine.
 This table helps you decide if it fits your use case.
 
 | | LimbicDB | Mem0 | LangChain Memory | ChromaDB | Raw JSON files |
@@ -301,9 +337,9 @@ const context = await memory.recall('allergies')
 // → [{ content: 'User is allergic to nuts', strength: 0.85, kind: 'fact', ... }]
 
 // Store memory-adjacent state (not runtime state)
-await memory.set('session_summary', { 
+await memory.set('session_summary', {
   lastTopic: 'allergies',
-  timestamp: Date.now() 
+  timestamp: Date.now()
 })
 
 // Close cleanly
@@ -324,14 +360,18 @@ const prodDb = openSQLite('./agent.limbic')
 
 ### Semantic Search Example
 
+> **⚠️ Important**: The example below shows the semantic search API, but **in v0.4.0-alpha.1, semantic search only works fully with the memory backend** (`open(':memory:')`).
+>
+> Using `path: './agent.limbic'` (SQLite backend) will store embeddings but fall back to keyword search. This will be fixed in upcoming releases.
+
 LimbicDB v0.4 alpha adds semantic search support with bring-your-own embedder:
 
 ```typescript
 import { open } from 'limbicdb'
 
-// Open with your embedding function
-const memory = open({
-  path: './agent.limbic',
+// Option 1: Memory backend (full semantic search in v0.4 alpha)
+const memoryBackend = open({
+  path: ':memory:',  // Memory backend supports full semantic search
   embedder: {
     async embed(text) {
       // Use @xenova/transformers, OpenAI, Cohere, or any provider
@@ -342,14 +382,33 @@ const memory = open({
   }
 })
 
-// Semantic recall finds meaning, not just keywords
-const results = await memory.recall('user interface preferences', {
-  mode: 'semantic', // or 'hybrid' or 'keyword'
+// Semantic recall with memory backend
+const memoryResults = await memoryBackend.recall('user interface preferences', {
+  mode: 'semantic', // Works fully with memory backend
   limit: 5
 })
 
-console.log(`Mode: ${results.meta.mode}`)
-console.log(`Fallback: ${results.meta.fallback}`) // true if no embedder
+console.log(`Memory backend mode: ${memoryResults.meta.mode}`) // Should be 'semantic'
+console.log(`Fallback: ${memoryResults.meta.fallback}`) // Should be false
+
+// Option 2: SQLite backend (stores embeddings, search in progress)
+const sqliteBackend = open({
+  path: './agent.limbic',  // SQLite backend - semantic search not yet implemented
+  embedder: {
+    async embed(text) { return computeEmbedding(text) },
+    dimensions: 384
+  }
+})
+
+const sqliteResults = await sqliteBackend.recall('user interface preferences', {
+  mode: 'semantic',
+  limit: 5
+})
+
+console.log(`SQLite backend mode: ${sqliteResults.meta.mode}`) // Will be 'keyword' (fallback)
+console.log(`Fallback: ${sqliteResults.meta.fallback}`) // Will be true
+console.log(`Requested: ${sqliteResults.meta.requestedMode}`) // Will be 'semantic'
+console.log(`Executed: ${sqliteResults.meta.executedMode}`) // Will be 'keyword'
 ```
 
 See the full example: [`examples/semantic-recall.ts`](examples/semantic-recall.ts)

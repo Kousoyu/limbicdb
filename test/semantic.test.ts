@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest'
-import { openMemory, openSQLite } from '../src/index'
+import fs from 'fs'
+import { open, openMemory, openSQLite } from '../src/index'
 import type { LimbicDB, Embedder, RecallResult } from '../src/types'
 
 // Helper to run tests with both backends
@@ -28,6 +29,11 @@ const mockEmbedder: Embedder = {
   },
   dimensions: 384,
   modelHint: 'test-model'
+}
+
+// Helper function to create mock embedder
+function createMockEmbedder(): Embedder {
+  return mockEmbedder
 }
 
 // Failing embedder for error handling tests
@@ -121,20 +127,15 @@ describeWithBackends('LimbicDB Semantic Search Tests', (createDb) => {
   })
 
   describe('vector consistency', () => {
-    it('should serialize and deserialize vectors with minimal precision loss', async () => {
+    it.skip('should serialize and deserialize vectors with minimal precision loss', async () => {
       // This test requires actual implementation to test
       // For now, it's a placeholder
-      expect(true).toBe(true)
+      // TODO: Implement when vector serialization is properly implemented
     })
 
-    it('should compute consistent cosine similarity', async () => {
+    it.skip('should compute consistent cosine similarity', async () => {
       // Test cosine similarity utility function
-      const vec1 = [1, 0, 0]
-      const vec2 = [0, 1, 0]
-      const vec3 = [1, 1, 0]
-      
-      // These would be tested with actual cosine similarity function
-      expect(true).toBe(true)
+      // TODO: Implement when cosine similarity utility is exposed for testing
     })
   })
 
@@ -157,10 +158,9 @@ describeWithBackends('LimbicDB Semantic Search Tests', (createDb) => {
       expect(result.memories.length).toBeGreaterThanOrEqual(1) // At least keyword match
     })
 
-    it('should apply correct weighting (30% keyword, 70% semantic) when implemented', async () => {
+    it.skip('should apply correct weighting (30% keyword, 70% semantic) when implemented', async () => {
       // This test requires actual implementation
-      // For now, just ensure the test doesn't fail
-      expect(true).toBe(true)
+      // TODO: Implement when hybrid search with configurable weights is implemented
     })
 
     it('should handle cases where only one modality returns results (when implemented)', async () => {
@@ -226,9 +226,9 @@ describeWithBackends('LimbicDB Semantic Search Tests', (createDb) => {
   })
 
   describe('configuration', () => {
-    it('should allow embedder configuration via constructor', async () => {
+    it.skip('should allow embedder configuration via constructor', async () => {
       // This test would require the actual API to support embedder in config
-      expect(true).toBe(true)
+      // TODO: Implement when embedder can be configured via constructor (not just @ts-ignore)
     })
 
     it('should track embedding statistics in stats (when implemented)', async () => {
@@ -258,6 +258,80 @@ describeWithBackends('LimbicDB Semantic Search Tests', (createDb) => {
       
       // Assert: should still work
       expect(Array.isArray(legacyResult)).toBe(true)
+    })
+  })
+
+  describe('README contract smoke test', () => {
+    it('should accurately report execution mode for SQLite backend', async () => {
+      // This test simulates what a user would do following README
+      // Default example: open('./agent.limbic') -> SQLite backend
+      
+      // Create a temporary file path
+      const tempFilePath = '/tmp/limbicdb-smoke-test.limbic'
+      
+      try {
+        // Simulate README example with embedder
+        const embedder = createMockEmbedder()
+        const memory = open({ path: tempFilePath, embedder })
+        
+        // Add some memories - include the query term to ensure keyword match
+        await memory.remember('User prefers React with TypeScript')
+        await memory.remember('Project uses PostgreSQL database')
+        await memory.remember('Technology stack includes React and PostgreSQL')
+        
+        // Give time for async embeddings (if any)
+        await new Promise(resolve => setTimeout(resolve, 100))
+        
+        // Test semantic mode - SQLite backend should fall back to keyword
+        const result = await memory.recall('technology', { mode: 'semantic' })
+        
+        // Critical assertions from user's analysis:
+        // 1. executedMode should be 'keyword' (SQLite doesn't implement semantic yet)
+        expect(result.meta.executedMode).toBe('keyword')
+        
+        // 2. requestedMode should be 'semantic' (what user asked for)
+        expect(result.meta.requestedMode).toBe('semantic')
+        
+        // 3. fallback should be true (semantic requested but keyword executed)
+        expect(result.meta.fallback).toBe(true)
+        
+        // 4. mode should equal executedMode (backward compatibility)
+        expect(result.meta.mode).toBe(result.meta.executedMode)
+        
+        // 5. Should still return some results (keyword search works)
+        expect(result.memories.length).toBeGreaterThan(0)
+        
+      } finally {
+        // Cleanup
+        try {
+          await fs.promises.unlink(tempFilePath).catch(() => {})
+        } catch {
+          // Ignore cleanup errors
+        }
+      }
+    })
+
+    it('should accurately report execution mode for memory backend', async () => {
+      // Memory backend should support all modes when embedder is provided
+      const embedder = createMockEmbedder()
+      const memory = open({ path: ':memory:', embedder })
+      
+      // Add some memories - include the query term to ensure keyword match
+      await memory.remember('User prefers React with TypeScript')
+      await memory.remember('Project uses PostgreSQL database')
+      await memory.remember('Technology stack includes React and PostgreSQL')
+      
+      // Give time for async embeddings
+      await new Promise(resolve => setTimeout(resolve, 100))
+      
+      // Test semantic mode - memory backend should execute semantic
+      const result = await memory.recall('technology', { mode: 'semantic' })
+      
+      // Memory backend has full semantic implementation
+      expect(result.meta.executedMode).toBe('semantic')
+      expect(result.meta.requestedMode).toBe('semantic')
+      expect(result.meta.fallback).toBe(false)
+      expect(result.meta.mode).toBe('semantic')
     })
   })
 })
