@@ -7,7 +7,7 @@
 把重要的记下来,按上下文召回,并能解释它为什么被用到--一切都在一个本地文件里完成。
 
 > **当前状态 (v0.4.0-alpha.1)**:
-> - **SQLite 后端**: 稳定关键词搜索,语义搜索进行中
+> - **SQLite 后端**: 稳定关键词搜索,实验性语义/混合搜索 MVP
 > - **内存后端**: 实验性语义/混合搜索原型
 > - **快照一致性**: SQLite 快照尚未包含嵌入向量
 
@@ -60,8 +60,8 @@ await memory.close()
 | 功能 | SQLite 后端 (`open('./agent.limbic')`) | 内存后端 (`open(':memory:')`) |
 |------|----------------------------------------|--------------------------------|
 | **关键词搜索** | ✅ 稳定 (FTS5 + LIKE 回退) | ✅ 稳定 |
-| **语义搜索** | 🔄 进行中 (存储嵌入向量,搜索待实现) | ✅ 实验性 (自带嵌入函数) |
-| **混合搜索** | 🔄 进行中 | ✅ 实验性 (70% 语义 + 30% 关键词) |
+| **语义搜索** | 🧪 实验性 (MVP) | ✅ 实验性 (自带嵌入函数) |
+| **混合搜索** | 🧪 实验性 (MVP) | ✅ 实验性 (70% 语义 + 30% 关键词) |
 | **持久化存储** | ✅ 单个 `.limbic` 文件 | ❌ 仅内存 (易失性) |
 | **快照/恢复** | ✅ (不含嵌入向量) | ✅ (包含嵌入向量) |
 | **基于文件** | ✅ | ❌ |
@@ -129,8 +129,8 @@ LimbicDB v0.4.0-alpha.1 当前有以下限制:
 * **部分词匹配不保证**
   搜索 "test" 可能不会匹配 "testing" 或 "tested",具体取决于 FTS 配置。
 
-* **SQLite 语义/混合搜索进行中**
-  默认的 `open('./agent.limbic')` 路径使用 SQLite 后端,其中语义/混合搜索尚未实现 (降级到关键词搜索)。
+* **SQLite 语义/混合搜索实验性**
+  默认的 `open('./agent.limbic')` 路径使用 SQLite 后端,其中语义/混合搜索现在以 MVP 形式提供但仍属实验性。
 
 * **记忆文件格式稳定性**
   `.limbic` 文件格式在 alpha 版本间可能变化。
@@ -166,8 +166,8 @@ LimbicDB 目前仍处于 alpha 阶段。
 
 **进行中**:
 * 🔄 **嵌入向量存储** - 基础集成已完成
-* 🔄 **语义搜索** - 向量存储已实现,搜索进行中
-* 🔄 **混合搜索** - 关键词 + 语义组合进行中
+* 🧪 **语义搜索** - 实验性 MVP 实现
+* 🧪 **混合搜索** - 实验性 MVP 实现
 * 🔄 **快照一致性** - 嵌入向量尚未包含在快照中
 
 ### 内存后端 (`open(':memory:')`)
@@ -199,7 +199,7 @@ LimbicDB 目前仍处于 alpha 阶段。
 | **中文/CJK 精确词** | 🔄 改进中 | alpha.2 中的混合 FTS5 + LIKE 回退 |
 | **中文/CJK 部分匹配** | 🧪 实验性 | 通过 LIKE 回退提供有限支持 |
 | **中英混合查询** | 🧪 实验性 | 可用但排序可能不理想 |
-| **语义/嵌入搜索** | 🧪 实验性 (自带嵌入函数) | 内存后端完全实现,SQLite 后端存储嵌入(搜索进行中) |
+| **语义/嵌入搜索** | 🧪 实验性 (自带嵌入函数) | 内存后端完全实现,SQLite 后端实验性 MVP |
 
 **状态说明:**
 * ✅ **稳定** - 可靠、经过测试、可使用
@@ -217,7 +217,7 @@ LimbicDB 不是向量数据库。它是一个记忆生命周期引擎。
 | **定位** | 记忆生命周期引擎 | 记忆即服务 | 链的记忆模块 | 向量数据库 | DIY |
 | **本地无服务端** | ✅ 单 `.limbic` 文件 | ⚠️ 有本地模式,但设计用于云端 | ✅ | ✅ | ✅ |
 | **无需 API 密钥** | ✅ | ❌ (云端) / ✅ (本地) | ✅ | ✅ | ✅ |
-| **语义搜索** | 🧪 实验性 (自带嵌入函数) | ✅ 内置 | ✅ 通过向量存储 | ✅ 核心功能 | ❌ |
+| **语义搜索** | 🧪 实验性 (两个后端,自带嵌入函数) | ✅ 内置 | ✅ 通过向量存储 | ✅ 核心功能 | ❌ |
 | **关键词搜索** | ✅ FTS5 + LIKE 回退 | ✅ | ✅ | ⚠️ 有限支持 | ❌ |
 | **记忆衰减/遗忘** | ✅ 半衰期模型 | ⚠️ 基础功能 | ❌ | ❌ | ❌ |
 | **自动分类** | ✅ 事实/经历/偏好/流程/目标 | ❌ | ❌ | ❌ | ❌ |
@@ -382,9 +382,9 @@ const prodDb = openSQLite('./agent.limbic')
 
 ### 语义搜索示例
 
-> **⚠️ 重要**: 下面的示例展示了语义搜索 API,但 **在 v0.4.0-alpha.1 中,语义搜索仅在内存在后端 (`open(':memory:')`) 中完全工作**。
+> **⚠️ 重要**: 下面的示例展示了语义搜索 API。**在 v0.4.0-alpha.1 中,语义搜索在两个后端都工作**但仍属实验性。
 >
-> 使用 `path: './agent.limbic'` (SQLite 后端) 会存储嵌入向量,但会降级到关键词搜索。这将在未来的版本中修复。
+> 内存后端 (`open(':memory:')`) 有更成熟的实现。SQLite 后端 (`open('./agent.limbic')`) 现在以 MVP 形式支持语义和混合搜索,但如果尚未存储嵌入向量,仍可能降级到关键词搜索。
 
 LimbicDB v0.4 alpha 增加语义搜索支持,使用自带嵌入函数:
 
@@ -413,9 +413,9 @@ const memoryResults = await memoryBackend.recall('用户界面偏好', {
 console.log(`内存后端模式: ${memoryResults.meta.mode}`) // 应该是 'semantic'
 console.log(`降级: ${memoryResults.meta.fallback}`) // 应该是 false
 
-// 选项 2: SQLite 后端 (存储嵌入向量，搜索进行中)
+// 选项 2: SQLite 后端 (实验性语义搜索 MVP)
 const sqliteBackend = open({
-  path: './agent.limbic',  // SQLite 后端 - 语义搜索尚未实现
+  path: './agent.limbic',  // SQLite 后端 - 语义搜索实验性
   embedder: {
     async embed(text) { return computeEmbedding(text) },
     dimensions: 384
@@ -427,10 +427,10 @@ const sqliteResults = await sqliteBackend.recall('用户界面偏好', {
   limit: 5
 })
 
-console.log(`SQLite 后端模式: ${sqliteResults.meta.mode}`) // 将是 'keyword' (降级)
-console.log(`降级: ${sqliteResults.meta.fallback}`) // 将是 true
-console.log(`请求模式: ${sqliteResults.meta.requestedMode}`) // 将是 'semantic'
-console.log(`执行模式: ${sqliteResults.meta.executedMode}`) // 将是 'keyword'
+console.log(`SQLite 后端模式: ${sqliteResults.meta.mode}`) // 可能是 'semantic' 或 'keyword' (如果降级)
+console.log(`降级: ${sqliteResults.meta.fallback}`) // 如果存在嵌入向量为 false,否则为 true
+console.log(`请求模式: ${sqliteResults.meta.requestedMode}`) // 'semantic'
+console.log(`执行模式: ${sqliteResults.meta.executedMode}`) // 成功则为 'semantic',降级则为 'keyword'
 ```
 
 查看完整示例:[`examples/semantic-recall.ts`](examples/semantic-recall.ts)

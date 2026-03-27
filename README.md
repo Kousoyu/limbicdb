@@ -7,7 +7,7 @@ English | [简体中文](./README.zh-CN.md)
 Store what matters, recall it with context, and inspect why it was used — in a single local file.
 
 > **Current Status (v0.4.0-alpha.1)**: 
-> - **SQLite backend**: Stable keyword search, semantic search in progress
+> - **SQLite backend**: Stable keyword search, experimental semantic/hybrid search MVP
 > - **Memory backend**: Experimental semantic/hybrid search prototype
 > - **Snapshot parity**: Embeddings not yet included in SQLite snapshots
 
@@ -16,8 +16,8 @@ Store what matters, recall it with context, and inspect why it was used — in a
 | Feature | SQLite Backend (`open('./agent.limbic')`) | Memory Backend (`open(':memory:')`) |
 |---------|-------------------------------------------|-------------------------------------|
 | **Keyword search** | ✅ Stable (FTS5 + LIKE fallback) | ✅ Stable |
-| **Semantic search** | 🔄 In progress (stores embeddings, search TODO) | ✅ Experimental (bring-your-own embedder) |
-| **Hybrid search** | 🔄 In progress | ✅ Experimental (70% semantic, 30% keyword) |
+| **Semantic search** | 🧪 Experimental (MVP) | ✅ Experimental (bring-your-own embedder) |
+| **Hybrid search** | 🧪 Experimental (MVP) | ✅ Experimental (70% semantic, 30% keyword) |
 | **Persistent storage** | ✅ Single `.limbic` file | ❌ Volatile (in-memory only) |
 | **Snapshot/Restore** | ✅ (without embeddings) | ✅ (with embeddings) |
 | **File-based** | ✅ | ❌ |
@@ -97,8 +97,8 @@ LimbicDB v0.4.0-alpha.1 has these current limitations:
 * **Partial word matching not guaranteed**  
   Searching for "test" may not match "testing" or "tested" depending on exact FTS configuration.
 
-* **SQLite semantic/hybrid search in progress**  
-  The default `open('./agent.limbic')` path uses SQLite backend where semantic/hybrid search is not yet implemented (fallback to keyword).
+* **SQLite semantic/hybrid search experimental**  
+  The default `open('./agent.limbic')` path uses SQLite backend where semantic/hybrid search is now available in MVP form but still experimental.
 
 * **Memory format stability**  
   The `.limbic` file format may change between alpha releases.
@@ -134,8 +134,8 @@ Please open an issue using the built-in templates.
 
 **In progress**:
 * 🔄 **Embedding storage** - basic integration complete
-* 🔄 **Semantic search** - vector storage implemented, search in progress
-* 🔄 **Hybrid search** - keyword + semantic combination in progress
+* 🧪 **Semantic search** - experimental MVP implementation
+* 🧪 **Hybrid search** - experimental MVP implementation
 * 🔄 **Snapshot parity** - embeddings not yet included in snapshots
 
 ### Memory Backend (`open(':memory:')`)
@@ -167,7 +167,7 @@ To set clear expectations about what kind of search works today:
 | **Chinese/CJK exact term** | 🔄 Improving | Hybrid FTS5 + LIKE fallback in alpha.2 |
 | **Chinese/CJK partial match** | 🧪 Experimental | Limited support via LIKE fallback |
 | **Mixed CJK + English** | 🧪 Experimental | Works but ranking may be suboptimal |
-| **Semantic/embedding search** | 🧪 Experimental (bring-your-own embedder) | Memory backend fully implemented, SQLite backend stores embeddings (search in progress) |
+| **Semantic/embedding search** | 🧪 Experimental (bring-your-own embedder) | Memory backend fully implemented, SQLite backend experimental MVP |
 
 **Status Key:**
 * ✅ **Stable** - Reliable, tested, ready for use
@@ -195,7 +195,7 @@ This table helps you decide if it fits your use case.
 | **What it is** | Memory lifecycle engine | Memory-as-a-service | Memory modules for chains | Vector database | DIY |
 | **Local, no server** | ✅ Single `.limbic` file | ⚠️ Has local mode, but designed for cloud | ✅ | ✅ | ✅ |
 | **No API keys needed** | ✅ | ❌ (cloud) / ✅ (local) | ✅ | ✅ | ✅ |
-| **Semantic search** | 🧪 Experimental (bring-your-own embedder) | ✅ Built-in | ✅ Via vector stores | ✅ Core feature | ❌ |
+| **Semantic search** | 🧪 Experimental (both backends, bring-your-own embedder) | ✅ Built-in | ✅ Via vector stores | ✅ Core feature | ❌ |
 | **Keyword search** | ✅ FTS5 + LIKE fallback | ✅ | ✅ | ⚠️ Limited | ❌ |
 | **Memory decay / forgetting** | ✅ Half-life model | ⚠️ Basic | ❌ | ❌ | ❌ |
 | **Auto-classification** | ✅ fact/episode/preference/procedure/goal | ❌ | ❌ | ❌ | ❌ |
@@ -360,9 +360,9 @@ const prodDb = openSQLite('./agent.limbic')
 
 ### Semantic Search Example
 
-> **⚠️ Important**: The example below shows the semantic search API, but **in v0.4.0-alpha.1, semantic search only works fully with the memory backend** (`open(':memory:')`).
+> **⚠️ Important**: The example below shows the semantic search API. **In v0.4.0-alpha.1, semantic search works with both backends** but is still experimental.
 >
-> Using `path: './agent.limbic'` (SQLite backend) will store embeddings but fall back to keyword search. This will be fixed in upcoming releases.
+> The memory backend (`open(':memory:')`) has a more mature implementation. The SQLite backend (`open('./agent.limbic')`) now supports semantic and hybrid search in MVP form, but may fall back to keyword search if no embeddings are stored yet.
 
 LimbicDB v0.4 alpha adds semantic search support with bring-your-own embedder:
 
@@ -391,9 +391,9 @@ const memoryResults = await memoryBackend.recall('user interface preferences', {
 console.log(`Memory backend mode: ${memoryResults.meta.mode}`) // Should be 'semantic'
 console.log(`Fallback: ${memoryResults.meta.fallback}`) // Should be false
 
-// Option 2: SQLite backend (stores embeddings, search in progress)
+// Option 2: SQLite backend (experimental semantic search MVP)
 const sqliteBackend = open({
-  path: './agent.limbic',  // SQLite backend - semantic search not yet implemented
+  path: './agent.limbic',  // SQLite backend - semantic search experimental
   embedder: {
     async embed(text) { return computeEmbedding(text) },
     dimensions: 384
@@ -405,10 +405,10 @@ const sqliteResults = await sqliteBackend.recall('user interface preferences', {
   limit: 5
 })
 
-console.log(`SQLite backend mode: ${sqliteResults.meta.mode}`) // Will be 'keyword' (fallback)
-console.log(`Fallback: ${sqliteResults.meta.fallback}`) // Will be true
-console.log(`Requested: ${sqliteResults.meta.requestedMode}`) // Will be 'semantic'
-console.log(`Executed: ${sqliteResults.meta.executedMode}`) // Will be 'keyword'
+console.log(`SQLite backend mode: ${sqliteResults.meta.mode}`) // Could be 'semantic' or 'keyword' if fallback
+console.log(`Fallback: ${sqliteResults.meta.fallback}`) // false if embeddings exist, true otherwise
+console.log(`Requested: ${sqliteResults.meta.requestedMode}`) // 'semantic'
+console.log(`Executed: ${sqliteResults.meta.executedMode}`) // 'semantic' if successful, 'keyword' if fallback
 ```
 
 See the full example: [`examples/semantic-recall.ts`](examples/semantic-recall.ts)

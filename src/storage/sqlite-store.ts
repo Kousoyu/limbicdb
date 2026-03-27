@@ -54,6 +54,14 @@ CREATE TABLE IF NOT EXISTS state (
   updated_at INTEGER NOT NULL
 );
 
+-- Embeddings storage (for semantic search)
+CREATE TABLE IF NOT EXISTS memory_embeddings (
+  memory_id TEXT PRIMARY KEY,
+  vector BLOB NOT NULL,
+  dimensions INTEGER NOT NULL,
+  model_hint TEXT DEFAULT 'unknown'
+);
+
 -- Timeline audit log (append-only)
 CREATE TABLE IF NOT EXISTS timeline (
   id TEXT PRIMARY KEY,
@@ -70,7 +78,8 @@ CREATE TABLE IF NOT EXISTS snapshots (
   created_at INTEGER NOT NULL,
   memory_data TEXT NOT NULL, -- JSON
   state_data TEXT NOT NULL,   -- JSON
-  timeline_data TEXT NOT NULL -- JSON
+  timeline_data TEXT NOT NULL, -- JSON
+  embeddings_data TEXT         -- JSON (optional)
 );
 
 -- Indexes for performance
@@ -190,8 +199,8 @@ export class SQLiteStore implements IStorage {
     
     // Snapshot operations
     this.prepare('saveSnapshot', `
-      INSERT OR REPLACE INTO snapshots (id, created_at, memory_data, state_data, timeline_data)
-      VALUES (?, ?, ?, ?, ?)
+      INSERT OR REPLACE INTO snapshots (id, created_at, memory_data, state_data, timeline_data, embeddings_data)
+      VALUES (?, ?, ?, ?, ?, ?)
     `)
     
     this.prepare('getSnapshot', `
@@ -563,7 +572,8 @@ export class SQLiteStore implements IStorage {
       data.createdAt,
       JSON.stringify(data.memories),
       JSON.stringify(data.state),
-      JSON.stringify(data.timeline)
+      JSON.stringify(data.timeline),
+      data.embeddings ? JSON.stringify(data.embeddings) : null
     )
   }
   
@@ -573,12 +583,19 @@ export class SQLiteStore implements IStorage {
     
     if (!row) return null
     
-    return {
+    const snapshotData: SnapshotData = {
       memories: JSON.parse(row.memory_data),
       state: JSON.parse(row.state_data),
       timeline: JSON.parse(row.timeline_data),
       createdAt: row.created_at
     }
+    
+    // Add embeddings if they exist
+    if (row.embeddings_data) {
+      snapshotData.embeddings = JSON.parse(row.embeddings_data)
+    }
+    
+    return snapshotData
   }
   
   async deleteSnapshot(id: string): Promise<void> {

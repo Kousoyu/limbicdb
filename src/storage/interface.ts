@@ -30,10 +30,18 @@ export interface EventQuery {
   limit?: number
 }
 
+export interface EmbeddingRow {
+  memoryId: string
+  vector: number[]
+  dimensions: number
+  modelHint: string
+}
+
 export interface SnapshotData {
   memories: Array<[string, Memory]>
   state: Array<[string, string]>
   timeline: TimelineEvent[]
+  embeddings?: Array<[string, EmbeddingRow]>
   createdAt: number
 }
 

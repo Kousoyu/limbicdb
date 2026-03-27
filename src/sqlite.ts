@@ -223,20 +223,45 @@ export class LimbicDBSQLite implements LimbicDB {
     const requestedMode = options?.mode || 'keyword'
     
     // Determine what mode can actually be executed
-    // In SQLite backend, semantic/hybrid are not yet implemented, so always execute keyword
     const executedMode: RecallMode = this.determineActualMode(requestedMode)
-    const fallback = (requestedMode === 'semantic' || requestedMode === 'hybrid') && executedMode === 'keyword'
+    
+    // Check if we need to fallback due to missing embeddings
+    let finalExecutedMode = executedMode
+    let fallback = false
+    
+    if (executedMode === 'semantic' || executedMode === 'hybrid') {
+      // Verify we actually have embeddings
+      const hasEmbeds = await this.hasEmbeddings()
+      if (!hasEmbeds) {
+        finalExecutedMode = 'keyword'
+        fallback = true
+        console.warn('[limbicdb] SQLite backend: No embeddings found, falling back to keyword search')
+      }
+    } else if (requestedMode === 'semantic' || requestedMode === 'hybrid') {
+      // Requested semantic/hybrid but determined mode is keyword
+      fallback = true
+    }
     
     // Log warning if user requested semantic/hybrid but we're falling back
     if (fallback) {
-      console.warn('[limbicdb] SQLite backend: semantic/hybrid search not yet implemented, falling back to keyword')
+      console.warn(`[limbicdb] SQLite backend: ${requestedMode} search not available, falling back to keyword`)
     }
     
     let memories: Memory[] = []
     let embedMs = 0
     
-    // Always execute keyword recall for now (semantic/hybrid not implemented yet)
-    memories = await this.executeKeywordRecall(query, options, startTime)
+    // Execute appropriate recall based on mode
+    if (finalExecutedMode === 'keyword') {
+      memories = await this.executeKeywordRecall(query, options, startTime)
+    } else if (finalExecutedMode === 'semantic') {
+      const result = await this.executeSemanticRecall(query, options, startTime)
+      memories = result.memories
+      embedMs = result.embedMs
+    } else if (finalExecutedMode === 'hybrid') {
+      const result = await this.executeHybridRecall(query, options, startTime)
+      memories = result.memories
+      embedMs = result.embedMs
+    }
     
     const searchMs = Date.now() - startTime
     
@@ -244,8 +269,8 @@ export class LimbicDBSQLite implements LimbicDB {
       memories,
       meta: {
         requestedMode,
-        executedMode,
-        mode: executedMode, // Alias for backward compatibility
+        executedMode: finalExecutedMode,
+        mode: finalExecutedMode, // Alias for backward compatibility
         fallback,
         pendingEmbeddings: this._pendingEmbeddings,
         timing: {
@@ -256,9 +281,36 @@ export class LimbicDBSQLite implements LimbicDB {
     }
   }
   
+  private async hasEmbeddings(): Promise<boolean> {
+    if (!this._embeddingStore) return false
+    try {
+      const count = await this._embeddingStore.count()
+      return count > 0
+    } catch (err) {
+      // If we can't check, assume no embeddings
+      return false
+    }
+  }
+
   private determineActualMode(requestedMode: RecallMode): RecallMode {
-    // SQLite backend currently only supports keyword search
-    // Semantic/hybrid search is not yet implemented
+    // Handle keyword mode directly
+    if (requestedMode === 'keyword') {
+      return 'keyword'
+    }
+    
+    // Check if semantic/hybrid search is available
+    if (requestedMode === 'semantic' || requestedMode === 'hybrid') {
+      // Need embedder and embedding store
+      if (!this._embedder || !this._embeddingStore) {
+        return 'keyword' // fallback
+      }
+      
+      // Note: We can't check embeddings count synchronously here
+      // The actual check happens in the recall method
+      return requestedMode
+    }
+    
+    // Default fallback
     return 'keyword'
   }
   
@@ -325,6 +377,271 @@ export class LimbicDBSQLite implements LimbicDB {
       accessedAt: now,
       accessCount: mem.accessCount + 1
     }))
+  }
+
+  private async executeSemanticRecall(
+    query: string,
+    options: RecallOptions | undefined,
+    startTime: number
+  ): Promise<{ memories: Memory[]; embedMs: number }> {
+    const embedStartTime = Date.now()
+    
+    // Compute query embedding
+    const queryVector = await this._embedder!.embed(query)
+    const embedMs = Date.now() - embedStartTime
+    
+    const now = startTime
+    const limit = options?.limit || 10
+    const minStrength = options?.minStrength || 0.01
+    const kindFilter = options?.kind
+    const tagsFilter = options?.tags
+    const sinceFilter = options?.since ? parseTime(options.since) : undefined
+    
+    // First, get memories that match the filters
+    const filteredMemories = await this.store.searchMemories({
+      query: '', // Empty query to get all memories (filtered)
+      limit: 10000, // Large limit to get all
+      minStrength,
+      kind: kindFilter,
+      tags: tagsFilter,
+      since: sinceFilter
+    })
+    
+    // Create set of candidate memory IDs
+    const candidateMemoryIds = new Set<string>()
+    for (const memory of filteredMemories) {
+      candidateMemoryIds.add(memory.id)
+    }
+    
+    // Get all embeddings for candidates
+    await this.ensureEmbeddingStoreInitialized()
+    const embeddingRows = await this._embeddingStore!.getAllForSearch([])
+    
+    // Filter to only include candidates
+    const candidateEmbeddings = embeddingRows.filter(row => candidateMemoryIds.has(row.memoryId))
+    
+    // Compute similarities
+    const similarities: Array<{ memoryId: string; similarity: number }> = []
+    for (const row of candidateEmbeddings) {
+      // Check vector dimension compatibility
+      if (row.vector.length !== queryVector.length) {
+        // This shouldn't happen if using same embedder, but just in case
+        continue
+      }
+      
+      const similarity = cosineSimilarity(row.vector, queryVector)
+      if (similarity > 0) { // Only include positive similarities
+        similarities.push({
+          memoryId: row.memoryId,
+          similarity
+        })
+      }
+    }
+    
+    // Sort by similarity (descending)
+    similarities.sort((a, b) => b.similarity - a.similarity)
+    
+    // Get memories for top results
+    const topMemoryIds = similarities.slice(0, limit).map(item => item.memoryId)
+    const memories: Memory[] = []
+    
+    for (const memoryId of topMemoryIds) {
+      // Get memory details
+      const memoryResults = await this.store.searchMemories({
+        query: '',
+        limit: 1,
+        minStrength,
+        ids: [memoryId]
+      })
+      
+      if (memoryResults.length === 0) continue
+      
+      const memory = memoryResults[0]
+      
+      // Update access stats
+      const newStrength = computeStrength(
+        memory.baseStrength || memory.strength,
+        memory.createdAt,
+        now,
+        memory.accessCount + 1,
+        this.config.decay as DecayConfig,
+        now
+      )
+      
+      await this.store.updateMemoryAccess(
+        memory.id,
+        now,
+        newStrength
+      )
+      
+      memories.push({
+        ...memory,
+        strength: newStrength,
+        accessedAt: now,
+        accessCount: memory.accessCount + 1
+      })
+    }
+    
+    // Log recall event
+    await this.store.logEvent({
+      id: generateId(),
+      type: 'memory',
+      action: 'access',
+      content: `Semantic recall: "${query.substring(0, 50)}" (found ${memories.length} memories)`,
+      timestamp: now
+    })
+    
+    return { memories, embedMs }
+  }
+
+  private async executeHybridRecall(
+    query: string,
+    options: RecallOptions | undefined,
+    startTime: number
+  ): Promise<{ memories: Memory[]; embedMs: number }> {
+    const embedStartTime = Date.now()
+    
+    // Compute query embedding
+    const queryVector = await this._embedder!.embed(query)
+    const embedMs = Date.now() - embedStartTime
+    
+    const now = startTime
+    const limit = options?.limit || 10
+    const minStrength = options?.minStrength || 0.01
+    const kindFilter = options?.kind
+    const tagsFilter = options?.tags
+    const sinceFilter = options?.since ? parseTime(options.since) : undefined
+    
+    // Get keyword search results
+    const keywordResults = await this.store.searchMemories({
+      query,
+      limit: limit * 2, // Get extra for filtering
+      minStrength,
+      kind: kindFilter,
+      tags: tagsFilter,
+      since: sinceFilter
+    })
+    
+    // Get all memories matching filters (for semantic search)
+    const filteredMemories = await this.store.searchMemories({
+      query: '', // Empty query to get all memories (filtered)
+      limit: 10000,
+      minStrength,
+      kind: kindFilter,
+      tags: tagsFilter,
+      since: sinceFilter
+    })
+    
+    // Create set of candidate memory IDs
+    const candidateMemoryIds = new Set<string>()
+    for (const memory of filteredMemories) {
+      candidateMemoryIds.add(memory.id)
+    }
+    
+    // Get all embeddings for candidates
+    await this.ensureEmbeddingStoreInitialized()
+    const embeddingRows = await this._embeddingStore!.getAllForSearch([])
+    
+    // Filter to only include candidates
+    const candidateEmbeddings = embeddingRows.filter(row => candidateMemoryIds.has(row.memoryId))
+    
+    // Compute semantic similarities
+    const semanticScores = new Map<string, number>()
+    for (const row of candidateEmbeddings) {
+      if (row.vector.length !== queryVector.length) continue
+      
+      const similarity = cosineSimilarity(row.vector, queryVector)
+      // Normalize to 0-1 range (cosine similarity is -1 to 1)
+      const normalized = (similarity + 1) / 2
+      semanticScores.set(row.memoryId, normalized)
+    }
+    
+    // Compute keyword scores (simple presence)
+    const keywordScores = new Map<string, number>()
+    const queryLower = query.toLowerCase()
+    
+    for (const memory of keywordResults) {
+      let score = 0
+      if (memory.content.toLowerCase().includes(queryLower)) {
+        score = 1.0 // Exact match
+      } else {
+        // Partial matching (simplified)
+        const words = queryLower.split(/\s+/).filter(w => w.length > 2)
+        const contentLower = memory.content.toLowerCase()
+        const matchedWords = words.filter(w => contentLower.includes(w)).length
+        score = matchedWords / Math.max(1, words.length)
+      }
+      keywordScores.set(memory.id, score)
+    }
+    
+    // Combine scores for candidate memories (70% semantic, 30% keyword)
+    const combinedScores = new Map<string, number>()
+    
+    for (const memoryId of candidateMemoryIds) {
+      const keywordScore = keywordScores.get(memoryId) || 0
+      const semanticScore = semanticScores.get(memoryId) || 0
+      
+      // Hardcoded weights as per design
+      const combined = (semanticScore * 0.7) + (keywordScore * 0.3)
+      combinedScores.set(memoryId, combined)
+    }
+    
+    // Sort by combined score
+    const sortedMemoryIds = Array.from(candidateMemoryIds).sort((a, b) => {
+      return (combinedScores.get(b) || 0) - (combinedScores.get(a) || 0)
+    })
+    
+    // Get top results and update access stats
+    const topMemoryIds = sortedMemoryIds.slice(0, limit)
+    const memories: Memory[] = []
+    
+    for (const memoryId of topMemoryIds) {
+      // Get memory details
+      const memoryResults = await this.store.searchMemories({
+        query: '',
+        limit: 1,
+        minStrength,
+        ids: [memoryId]
+      })
+      
+      if (memoryResults.length === 0) continue
+      
+      const memory = memoryResults[0]
+      
+      // Update access stats
+      const newStrength = computeStrength(
+        memory.baseStrength || memory.strength,
+        memory.createdAt,
+        now,
+        memory.accessCount + 1,
+        this.config.decay as DecayConfig,
+        now
+      )
+      
+      await this.store.updateMemoryAccess(
+        memory.id,
+        now,
+        newStrength
+      )
+      
+      memories.push({
+        ...memory,
+        strength: newStrength,
+        accessedAt: now,
+        accessCount: memory.accessCount + 1
+      })
+    }
+    
+    // Log recall event
+    await this.store.logEvent({
+      id: generateId(),
+      type: 'memory',
+      action: 'access',
+      content: `Hybrid recall: "${query.substring(0, 50)}" (found ${memories.length} memories)`,
+      timestamp: now
+    })
+    
+    return { memories, embedMs }
   }
   
   // Legacy method for backward compatibility
