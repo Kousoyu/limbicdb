@@ -222,9 +222,9 @@ export class LimbicDBSQLite implements LimbicDB {
     const minStrength = options?.minStrength || 0.01
     const requestedMode = options?.mode || 'keyword'
     
-    // Determine what mode would be executed
+    // Determine what mode can actually be executed
     // In SQLite backend, semantic/hybrid are not yet implemented, so always execute keyword
-    const executedMode: RecallMode = 'keyword'
+    const executedMode: RecallMode = this.determineActualMode(requestedMode)
     const fallback = (requestedMode === 'semantic' || requestedMode === 'hybrid') && executedMode === 'keyword'
     
     // Log warning if user requested semantic/hybrid but we're falling back
@@ -235,7 +235,7 @@ export class LimbicDBSQLite implements LimbicDB {
     let memories: Memory[] = []
     let embedMs = 0
     
-    // Always execute keyword recall for now
+    // Always execute keyword recall for now (semantic/hybrid not implemented yet)
     memories = await this.executeKeywordRecall(query, options, startTime)
     
     const searchMs = Date.now() - startTime
@@ -257,20 +257,9 @@ export class LimbicDBSQLite implements LimbicDB {
   }
   
   private determineActualMode(requestedMode: RecallMode): RecallMode {
-    switch (requestedMode) {
-      case 'keyword':
-        return 'keyword'
-      case 'semantic':
-      case 'hybrid':
-        // Check if embedder is available
-        if (!this._embedder || !this._embeddingStore) {
-          return 'keyword' // fallback
-        }
-        // TODO: Check if embeddings exist for any memories
-        return requestedMode
-      default:
-        return 'keyword'
-    }
+    // SQLite backend currently only supports keyword search
+    // Semantic/hybrid search is not yet implemented
+    return 'keyword'
   }
   
   private async executeKeywordRecall(
