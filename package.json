@@ -1,7 +1,7 @@
 {
   "name": "limbicdb",
   "version": "0.2.0",
-  "description": "Embedded cognitive memory database for AI agents. Like SQLite, but for agent memory with cognitive science principles.",
+  "description": "Local-first memory engine for embedded agents. Durable, inspectable, and one-file by default.",
   "keywords": [
     "ai",
     "agent",

@@ -1,106 +1,88 @@
 # LimbicDB
 
-**Embedded cognitive memory database for AI agents.**
+English | [简体中文](./README.zh-CN.md)
 
-Like SQLite for databases. But for agent memory with cognitive science principles.
+**A local-first memory engine for embedded agents.**
 
-```bash
-npm install limbicdb
-```
+Store what matters, recall it with context, and inspect why it was used — in a single local file.
 
-```typescript
+## Why LimbicDB
+
+Most agent memory tools focus on storage or retrieval alone. LimbicDB is built around the full memory lifecycle:
+
+- **Remember** important information
+- **Recall** relevant context when needed
+- **Forget** or prune low-value memory over time
+- **Inspect** why something was recalled
+- **Compact** noisy memory into cleaner long-lived state
+
+LimbicDB is designed for agents that need durable, inspectable memory without requiring a server, a hosted platform, or a heavyweight runtime.
+
+## What LimbicDB is
+
+- A **local-first** memory engine
+- A **one-file** durable store for agent memory
+- A **memory lifecycle** runtime: remember, recall, forget, inspect
+- A **pluggable** foundation for local and embedded agents
+
+## What LimbicDB is not
+
+- Not an agent runtime
+- Not a workflow orchestrator
+- Not a cloud memory platform
+- Not a graph database
+- Not a “human-brain simulator”
+
+## Quick Start
+
+```ts
 import { open } from 'limbicdb'
 
 const memory = open('./agent.limbic')
 
-// Remember
-await memory.remember('User prefers React with TypeScript')
-await memory.remember('Project uses PostgreSQL on port 5432')
+await memory.remember('User prefers concise answers')
+await memory.remember('Project uses PostgreSQL')
 
-// Recall (full-text search + semantic when available)
-const context = await memory.recall('tech stack')
-// → [{ content: 'User prefers React with TypeScript', strength: 0.62, kind: 'preference', ... },
-//    { content: 'Project uses PostgreSQL on port 5432', strength: 0.58, kind: 'fact', ... }]
-
-// Persist state across restarts
-await memory.set('task', { name: 'Build login page', progress: 0.7 })
-// ... process crashes, restarts ...
-const task = await memory.get('task') // { name: 'Build login page', progress: 0.7 }
+const results = await memory.recall('user preferences')
 
 await memory.close()
 ```
 
-**One file. No server. No config. No external dependencies.**
+## Core Principles
+
+* **Local-first by default**
+ Your memory stays in a local file unless you choose otherwise.
+
+* **Inspectable, not magical**
+ Memory should be explainable, reviewable, and auditable.
+
+* **Lightweight, not bloated**
+ Designed to be embedded inside agents and tools without dragging in a platform.
+
+* **Model-agnostic**
+ Useful without a specific model provider, with optional enhancements when available.
+
+## Roadmap Direction
+
+LimbicDB is evolving toward a reliable memory runtime with:
+
+* stronger recall semantics
+* inspectable retrieval decisions
+* retention and pruning policies
+* compaction for long-lived memory stores
+* stable local file formats for embedded use
+
+## Relationship to CogniCore
+
+LimbicDB focuses on **memory**.
+CogniCore focuses on **runtime orchestration, governance, and recovery**.
+
+If you use both together:
+
+* **CogniCore** decides how the agent runs
+* **LimbicDB** decides how memory is stored, recalled, and maintained
 
 ---
-
-## Why LimbicDB?
-
-| Problem | Current solutions | LimbicDB |
-|---------|-------------------|-----------|
-| Agent forgets after restart | Write JSON files manually | `open('./agent.limbic')` — done |
-| Context management is painful | Dump entire chat history | Smart recall with relevance scoring |
-| Memory grows unbounded | Manual cleanup | **Automatic forgetting** based on cognitive science |
-| Need a vector database | Deploy Qdrant/Pinecone | Built-in, or use FTS5 with zero setup |
-| Can't audit agent decisions | Console.log everywhere | Full timeline with event history |
-
-## Key Innovation: Memories That Fade
-
-LimbicDB doesn't just store — it **forgets intelligently**.
-
-Based on the [Ebbinghaus forgetting curve](https://en.wikipedia.org/wiki/Forgetting_curve) and [spaced repetition](https://en.wikipedia.org/wiki/Spaced_repetition):
-
-- Memories **decay over time** (configurable half-life)
-- Memories accessed frequently **grow stronger**
-- Unimportant memories **disappear automatically**
-- Important memories **persist indefinitely**
-
-```typescript
-const memory = open({
-  path: './agent.limbic',
-  decay: {
-    halfLifeHours: 168, // 7 days: memory halves in strength each week
-  }
-})
-
-// This memory will fade if never recalled
-await memory.remember('User mentioned they had lunch at noon')
-
-// This memory will strengthen each time it's recalled  
-await memory.remember('User is a senior React developer')
-
-// Two weeks later...
-await memory.recall('user background')
-// → Returns the React developer fact (recalled often, still strong)
-// → The lunch fact has already been pruned (never recalled, decayed to zero)
-```
-
-**This is how human memory works.** Now your agent has it too.
-
-## Memory Types (Cognitive Primitives)
-
-LimbicDB automatically classifies memories based on cognitive science:
-
-| Kind | Description | Example | Brain Region |
-|------|-------------|---------|--------------|
-| `fact` | Definite knowledge | "The API runs on port 3000" | Semantic Memory |
-| `episode` | Event / experience | "Yesterday we refactored the auth module" | Episodic Memory |
-| `preference` | User preference | "User prefers functional components" | Implicit Memory |
-| `procedure` | How to do something | "Deploy: first build, then push to main" | Procedural Memory |
-| `goal` | Current objective | "Need to finish the dashboard by Friday" | Working Memory |
-
-```typescript
-// Auto-classified
-await memory.remember('User prefers dark theme') // → 'preference'
-await memory.remember('Yesterday we fixed the login bug') // → 'episode'
-await memory.remember('Need to deploy by EOD') // → 'goal'
-
-// Manual override
-await memory.remember('PostgreSQL rocks', { kind: 'preference' })
-
-// Filter by kind
-await memory.recall('', { kind: 'goal' }) // only current goals
-```
 
 ## API Reference (Quick)
 
@@ -111,13 +93,13 @@ Create or open a LimbicDB instance.
 Store a memory with auto-classification.
 
 ### `recall(query, options?)`
-Retrieve relevant memories (FTS5 + optional semantic).
+Retrieve relevant memories (local search and ranking).
 
 ### `forget(filter)`
 Explicitly forget memories (safety filters required).
 
 ### `get(key)` / `set(key, value)`
-Persistent key-value state.
+Persistent key-value state (memory-adjacent state only).
 
 ### `history(options?)`
 Query the timeline of all operations.
@@ -125,22 +107,116 @@ Query the timeline of all operations.
 ### `snapshot()`
 Create a point-in-time snapshot.
 
+### `close()`
+Cleanly close the database.
+
 ---
 
-## Philosophy
+## Memory Types
 
-> "The art of being wise is the art of knowing what to overlook."
-> — William James
+LimbicDB automatically classifies memories into cognitive types:
 
-Most memory systems try to remember everything. LimbicDB knows that **forgetting is just as important as remembering**. An agent drowning in irrelevant memories is worse than one with no memory at all.
+| Kind | Description | Example |
+|------|-------------|---------|
+| `fact` | Definite knowledge | "The API runs on port 3000" |
+| `episode` | Event / experience | "Yesterday we refactored the auth module" |
+| `preference` | User preference | "User prefers functional components" |
+| `procedure` | How to do something | "Deploy: first build, then push to main" |
+| `goal` | Current objective | "Need to finish the dashboard by Friday" |
 
-LimbicDB gives your agent a memory that works like yours: it fades, it strengthens through use, and it keeps what matters.
+```typescript
+// Auto-classified
+await memory.remember('User prefers dark theme') // → 'preference'
+await memory.remember('Yesterday we fixed the login bug') // → 'episode'
 
-## Why "Limbic"?
+// Manual override
+await memory.remember('PostgreSQL rocks', { kind: 'preference' })
+```
 
-The **limbic system** is the part of the brain responsible for emotion, behavior, motivation, and long-term memory. It's where memories are formed, consolidated, and retrieved. 
+## Memory Strength and Retention
 
-LimbicDB brings these cognitive principles to AI agents.
+Memories in LimbicDB have a strength score that evolves over time:
+
+- Memories accessed frequently **grow stronger**
+- Memories not recalled **gradually fade**
+- Low-strength memories may be **automatically pruned**
+- Important memories can be **explicitly preserved**
+
+```typescript
+const memory = open({
+  path: './agent.limbic',
+  decay: {
+    halfLifeHours: 168, // 7 days: memory halves in strength each week
+    pruneThreshold: 0.01, // Remove memories below this strength
+  }
+})
+```
+
+## Architecture
+
+LimbicDB is built around a simple but powerful core:
+
+1. **Storage Abstraction**
+   - In-memory store (fast, for development)
+   - SQLite store (durable, for production)
+   - Unified interface for future backends
+
+2. **Memory Lifecycle**
+   - Write-time classification and tagging
+   - Recall-time relevance scoring
+   - Background decay and pruning
+   - Optional compression and consolidation
+
+3. **Local-First Design**
+   - Single file format (`.limbic` SQLite database)
+   - No external dependencies by default
+   - Optional semantic search via pluggable embedders
+
+## Getting Started
+
+### Installation
+
+```bash
+npm install limbicdb
+```
+
+### Basic Usage
+
+```typescript
+import { open } from 'limbicdb'
+
+// Open a memory store (automatically chooses backend)
+const memory = open('./agent.limbic')
+
+// Remember something important
+await memory.remember('User is allergic to nuts')
+await memory.remember('Project deadline is Friday')
+
+// Recall relevant context
+const context = await memory.recall('allergies')
+// → [{ content: 'User is allergic to nuts', strength: 0.85, kind: 'fact', ... }]
+
+// Store memory-adjacent state (not runtime state)
+await memory.set('session_summary', { 
+  lastTopic: 'allergies',
+  timestamp: Date.now() 
+})
+
+// Close cleanly
+await memory.close()
+```
+
+### Advanced: Explicit Backend Selection
+
+```typescript
+import { openMemory, openSQLite } from 'limbicdb'
+
+// Force in-memory backend (development/testing)
+const devDb = openMemory(':memory:')
+
+// Force SQLite backend (production)
+const prodDb = openSQLite('./agent.limbic')
+```
 
 ## License
 
@@ -148,4 +224,4 @@ MIT
 
 ---
 
-*Inspired by Ebbinghaus (1885), Tulving (1972), and ACT-R (1993).*
+*Inspired by principles of memory retention and retrieval from cognitive science, but focused on practical engineering for embedded agents.*
