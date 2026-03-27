@@ -35,8 +35,8 @@
  * @packageDocumentation
  */
 
-// Re-export all public types
-export type {
+// Import types for internal use
+import type {
   LimbicDB,
   LimbicDBConfig,
   Memory,
@@ -51,8 +51,53 @@ export type {
   LimbicDBStats,
 } from './types'
 
-// Factory function — the main entry point
-export { open } from './core'
+// Re-export all public types
+export type {
+  LimbicDB,
+  LimbicDBConfig,
+  Memory,
+  MemoryKind,
+  TimelineEvent,
+  RecallOptions,
+  RememberOptions,
+  HistoryOptions,
+  ForgetFilter,
+  DecayConfig,
+  Embedder,
+  LimbicDBStats,
+}
+
+// Memory implementation (for ':memory:' paths)
+import { open as openMemory } from './core'
+// SQLite implementation (for file paths)
+import { openSQLite } from './sqlite'
+
+/**
+ * Open a LimbicDB database.
+ * 
+ * Automatically chooses the appropriate storage backend:
+ * - `:memory:` → In-memory implementation (fast, volatile)
+ * - File path → SQLite implementation (persistent, production-ready)
+ * 
+ * @param pathOrConfig - Database path or configuration object
+ * @returns A LimbicDB instance
+ */
+export function open(pathOrConfig: string | LimbicDBConfig): LimbicDB {
+  // Determine if we should use memory mode
+  const path = typeof pathOrConfig === 'string' ? pathOrConfig : pathOrConfig.path
+  
+  // Use memory mode for ':memory:' path
+  if (path === ':memory:') {
+    return openMemory(pathOrConfig)
+  }
+  
+  // Otherwise use SQLite
+  return openSQLite(pathOrConfig)
+}
+
+// Also export specialized open functions for explicit control
+export { open as openMemory } from './core'
+export { openSQLite } from './sqlite'
 
 // Version
-export const VERSION = '0.1.0'
+export const VERSION = '0.2.0'

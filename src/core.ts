@@ -7,7 +7,8 @@ import type {
   ForgetFilter,
   HistoryOptions,
   LimbicDBStats,
-  TimelineEvent
+  TimelineEvent,
+  DecayConfig
 } from './types'
 import { classifyMemory, extractTags } from './classify'
 import { computeStrength, predictExpiry, suggestReviewTime } from './decay'
@@ -140,7 +141,7 @@ export class LimbicDBImpl implements LimbicDB {
       now,
       now,
       0,
-      this.config.decay,
+      this.config.decay as DecayConfig,
       now
     )
     
@@ -155,8 +156,8 @@ export class LimbicDBImpl implements LimbicDB {
       createdAt: now,
       accessedAt: now,
       accessCount: 0,
-      expiresAt: predictExpiry(baseStrength, now, now, 0, this.config.decay),
-      reviewAt: suggestReviewTime(baseStrength, now, now, 0, this.config.decay),
+      expiresAt: predictExpiry(baseStrength, now, now, 0, this.config.decay as DecayConfig),
+      reviewAt: suggestReviewTime(baseStrength, now, now, 0, this.config.decay as DecayConfig),
       isDeleted: false,
     }
     
@@ -209,7 +210,7 @@ export class LimbicDBImpl implements LimbicDB {
           memory.createdAt,
           now,
           memory.accessCount,
-          this.config.decay,
+          this.config.decay as DecayConfig,
           now
         )
         
@@ -408,7 +409,7 @@ export class LimbicDBImpl implements LimbicDB {
   //       memory.createdAt,
   //       memory.accessedAt,
   //       memory.accessCount,
-  //       this.config.decay,
+  //       this.config.decay as any,
   //       now
   //     )
   //     
@@ -433,12 +434,12 @@ export function open(pathOrConfig: string | LimbicDBConfig): LimbicDB {
     ? { path: pathOrConfig }
     : pathOrConfig
   
-  const config: Required<LimbicDBConfig> = {
+  const config = {
     path: baseConfig.path,
     embedder: baseConfig.embedder,
-    decay: { ...DEFAULT_DECAY_CONFIG, ...baseConfig.decay },
+    decay: { ...DEFAULT_DECAY_CONFIG, ...baseConfig.decay } as DecayConfig,
     limits: { ...DEFAULT_LIMITS, ...baseConfig.limits },
-  }
+  } as Required<LimbicDBConfig>
   
   return new LimbicDBImpl(config)
 }
