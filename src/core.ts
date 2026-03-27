@@ -254,8 +254,8 @@ export class LimbicDBImpl implements LimbicDB {
         if (!kinds.includes(memory.kind)) continue
       }
       if (filter.tags && filter.tags.length > 0) {
-        const hasTag = filter.tags.some(tag => memory.tags.includes(tag))
-        if (!hasTag) continue
+        const hasAllTags = filter.tags.every(tag => memory.tags.includes(tag))
+        if (!hasAllTags) continue
       }
       if (beforeTime && memory.createdAt >= beforeTime) continue
       if (filter.maxStrength !== undefined && memory.strength > filter.maxStrength) continue

@@ -28,7 +28,7 @@ describe('LimbicDB SQLite Integration', () => {
     expect(results.some(r => r.content.includes('TypeScript'))).toBe(true)
   })
   
-  it.skip('should forget memories by filter', async () => {
+  it('should forget memories by filter', async () => {
     // Create test memories
     await db.remember('临时记忆 1', { tags: ['temp'] })
     await db.remember('临时记忆 2', { tags: ['temp'] })
