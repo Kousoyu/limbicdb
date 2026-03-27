@@ -137,7 +137,7 @@ async function runBenchmark() {
 }
 
 // Run benchmark
-if (require.main === module) {
+if (import.meta.url === `file://${process.argv[1]}`) {
   runBenchmark().catch(err => {
     console.error('Benchmark failed:', err)
     process.exit(1)
