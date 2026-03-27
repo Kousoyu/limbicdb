@@ -35,3 +35,6 @@ Thumbs.db
 # Test outputs
 test-results/
 junit.xml
+
+# Benchmark results
+benchmarks/results/

@@ -418,19 +418,35 @@ For a complete example with durable file storage and snapshots, see:
 
 ## Performance Baseline
 
-A performance benchmarking tool is available to measure search performance across different modes and memory scales:
+Two performance benchmarking tools are available:
+
+### 1. Detailed Benchmark (`search-benchmark.ts`)
+Measures search performance across different modes and memory scales:
 
 ```bash
 npx tsx benchmarks/search-benchmark.ts
 ```
 
-The benchmark measures:
+Measures:
 - **Keyword search**: SQLite FTS5 performance
-- **Semantic search**: Brute-force cosine similarity scaling
+- **Semantic search**: Brute-force cosine similarity scaling  
 - **Hybrid search**: Combined scoring performance
 - **Embedding computation**: Async embedding throughput
 
-**Note**: This is an internal benchmarking tool for development and comparison. Results are baselines only, not production metrics.
+### 2. Backend Comparison Baseline (`performance-baseline.ts`)
+Generates a markdown table comparing SQLite and memory backends:
+
+```bash
+npx tsx benchmarks/performance-baseline.ts
+```
+
+Outputs a markdown report with:
+- **Both backends**: SQLite (file) vs memory (:memory:)
+- **Three memory scales**: 100, 1,000, 5,000 memories
+- **Three search modes**: keyword, semantic, hybrid
+- **Interpretation notes**: Scaling characteristics and limitations
+
+**Note**: These are internal benchmarking tools for development and comparison. Results are baselines only, not production metrics. The alpha implementation uses brute-force vector search which scales linearly with memory count.
 
 ## License
 
