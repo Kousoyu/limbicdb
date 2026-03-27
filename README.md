@@ -93,6 +93,47 @@ If you try it, the most helpful feedback is:
 
 Please open an issue using the built-in templates.
 
+## Current Status
+
+To avoid confusion between what's implemented today and what's planned for the future, here's a clear breakdown:
+
+### Current (implemented and stable)
+* **One-file SQLite storage** - `.limbic` file format
+* **Dual backends** - Memory (fast, volatile) + SQLite (persistent)
+* **Contract-tested semantics** - 34 tests ensure memory and SQLite backends behave identically
+* **Keyword-based recall** - Local text matching and ranking
+* **Memory lifecycle** - remember, recall, forget, inspect, history
+* **Auto-classification** - facts, episodes, preferences, procedures, goals
+
+### Experimental (improving, may change)
+* **CJK search enhancement** - Hybrid FTS5 + LIKE fallback for Chinese/Japanese/Korean text
+* **Inspectability depth** - Understanding why memories were recalled
+* **Compaction behavior** - Noise reduction and long-term memory consolidation
+
+### Planned (not yet implemented)
+* **Embedding / semantic recall** - Vector-based similarity search
+* **Richer explanation APIs** - Deeper insights into memory decisions
+* **Stronger file format guarantees** - Stable `.limbic` format across versions
+* **Advanced retention policies** - Sophisticated decay and pruning strategies
+
+## Search Capability Matrix
+
+To set clear expectations about what kind of search works today:
+
+| Capability | Status | Notes |
+|------------|--------|-------|
+| **English keyword search** | ✅ Stable | Exact and partial word matching with FTS5 |
+| **Chinese/CJK exact term** | 🔄 Improving | Hybrid FTS5 + LIKE fallback in alpha.2 |
+| **Chinese/CJK partial match** | 🧪 Experimental | Limited support via LIKE fallback |
+| **Mixed CJK + English** | 🧪 Experimental | Works but ranking may be suboptimal |
+| **Semantic/embedding search** | 📋 Planned | Not yet implemented |
+
+**Status Key:**
+* ✅ **Stable** - Reliable, tested, ready for use
+* 🔄 **Improving** - Functional but actively being refined  
+* 🧪 **Experimental** - Available but may have limitations
+* 📋 **Planned** - On the roadmap, not yet implemented
+
 ## Roadmap Direction
 
 LimbicDB is evolving toward a reliable memory runtime with:

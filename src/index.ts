@@ -1,5 +1,5 @@
 /**
- * LimbicDB — Embedded cognitive memory database for AI agents
+ * LimbicDB — A local-first memory engine for embedded agents
  * 
  * @example Basic usage
  * ```typescript
@@ -10,25 +10,19 @@
  * await memory.remember('User prefers React with TypeScript')
  * const results = await memory.recall('tech stack')
  * 
- * await memory.set('currentTask', { name: 'Build login page' })
- * const task = await memory.get('currentTask')
- * 
  * await memory.close()
  * ```
  * 
- * @example In-memory mode
+ * @example In-memory mode (development/testing)
  * ```typescript
  * const memory = open(':memory:')
  * ```
  * 
- * @example With custom embedder
+ * @example Advanced configuration
  * ```typescript
- * import { open } from 'limbicdb'
- * import { OpenAIEmbedder } from 'limbicdb-embedder-openai'
- * 
  * const memory = open({
  *   path: './agent.limbic',
- *   embedder: new OpenAIEmbedder({ apiKey: process.env.OPENAI_API_KEY }),
+ *   // embedder: new OpenAIEmbedder({ apiKey: process.env.OPENAI_API_KEY }), // Future enhancement
  * })
  * ```
  * 
@@ -76,8 +70,8 @@ import { openSQLite } from './sqlite'
  * Open a LimbicDB database.
  * 
  * Automatically chooses the appropriate storage backend:
- * - `:memory:` → In-memory implementation (fast, volatile)
- * - File path → SQLite implementation (persistent, production-ready)
+ * - `:memory:` → In-memory implementation (fast, volatile, for development/testing)
+ * - File path → SQLite implementation (persistent, durable storage)
  * 
  * @param pathOrConfig - Database path or configuration object
  * @returns A LimbicDB instance
@@ -100,4 +94,4 @@ export { open as openMemory } from './core'
 export { openSQLite } from './sqlite'
 
 // Version
-export const VERSION = '0.2.0'
+export const VERSION = '0.3.0-alpha.2'

@@ -8,13 +8,9 @@
     "memory",
     "llm",
     "embedded-database",
-    "cognitive",
     "sqlite",
-    "vector-search",
-    "forgetting-curve",
-    "limbic",
-    "memory-decay",
-    "cognitive-primitives"
+    "local-first",
+    "memory-engine"
   ],
   "author": "Kousoyu",
   "license": "MIT",
