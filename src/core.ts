@@ -191,10 +191,10 @@ export class LimbicDBImpl implements LimbicDB {
         if (!kinds.includes(memory.kind)) continue
       }
       
-      // Check tags filter
+      // Check tags filter - must contain ALL specified tags
       if (tagsFilter && tagsFilter.length > 0) {
-        const hasTag = tagsFilter.some(tag => memory.tags.includes(tag))
-        if (!hasTag) continue
+        const hasAllTags = tagsFilter.every(tag => memory.tags.includes(tag))
+        if (!hasAllTags) continue
       }
       
       // Check time filter

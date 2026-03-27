@@ -291,19 +291,30 @@ export class SQLiteStore implements IStorage {
   async searchMemories(query: SearchQuery): Promise<Memory[]> {
     // Handle empty query - use filter-based search instead of FTS
     if (!query.query.trim()) {
-      return this.getMemoriesByFilter({
+      // For empty query, get all memories matching filters
+      const filterMemories = await this.getMemoriesByFilter({
         kind: query.kind,
         tags: query.tags,
-        before: query.since ? undefined : Date.now(), // Get all if no since filter
-        maxStrength: query.minStrength !== undefined ? undefined : 1.0 // No max strength filter
-      }).then(memories => {
-        // Apply minStrength and since filters
-        return memories.filter(memory => {
-          if (query.minStrength !== undefined && memory.strength < query.minStrength) return false
-          if (query.since !== undefined && memory.createdAt < query.since) return false
-          return true
-        }).slice(0, query.limit)
+        // No before filter for empty query - we want all memories
+        maxStrength: 1.0 // Get all memories regardless of strength
       })
+      
+      // Apply minStrength and since filters
+      const filtered = filterMemories.filter(memory => {
+        if (query.minStrength !== undefined && memory.strength < query.minStrength) return false
+        if (query.since !== undefined && memory.createdAt < query.since) return false
+        return true
+      })
+      
+      // Sort by strength (descending) then by recency
+      filtered.sort((a, b) => {
+        if (Math.abs(b.strength - a.strength) > 0.05) {
+          return b.strength - a.strength
+        }
+        return b.accessedAt - a.accessedAt
+      })
+      
+      return filtered.slice(0, query.limit)
     }
     
     // Simple keyword search for now (will be enhanced with hybrid search)
