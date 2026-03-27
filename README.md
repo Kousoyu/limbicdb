@@ -413,6 +413,9 @@ console.log(`Executed: ${sqliteResults.meta.executedMode}`) // 'semantic' if suc
 
 See the full example: [`examples/semantic-recall.ts`](examples/semantic-recall.ts)
 
+For a complete example with durable file storage and snapshots, see:
+[`examples/durable-semantic-snapshot.ts`](examples/durable-semantic-snapshot.ts)
+
 ## License
 
 MIT

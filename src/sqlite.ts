@@ -65,10 +65,36 @@ export class LimbicDBSQLite implements LimbicDB {
     
     // Initialize embedding store if embedder is provided
     if (this._embedder) {
-      // @ts-ignore - Access private db field
-      const db = (this.store as any).db
-      if (db) {
-        this._embeddingStore = new EmbeddingStore({ type: 'sqlite', db })
+      // Get database connection from store
+      const rawDb = (this.store as any).getRawDb?.()
+      // Debug logging removed for production
+      if (rawDb) {
+        // Create adapter for better-sqlite3 Database
+        // better-sqlite3 Database has .prepare() method, Statement has .run(), .get(), .all()
+        // Database also has .exec() for DDL
+        const dbAdapter = {
+          exec(sql: string) {
+            if (typeof rawDb.exec === 'function') {
+              return rawDb.exec(sql)
+            } else {
+              // Fallback: use prepare for single statement
+              rawDb.prepare(sql).run()
+            }
+          },
+          run(sql: string, ...params: any[]) {
+            return rawDb.prepare(sql).run(...params)
+          },
+          get(sql: string, ...params: any[]) {
+            return rawDb.prepare(sql).get(...params)
+          },
+          all(sql: string, ...params: any[]) {
+            return rawDb.prepare(sql).all(...params)
+          }
+        }
+        this._embeddingStore = new EmbeddingStore({ type: 'sqlite', db: dbAdapter })
+        // EmbeddingStore initialized with adapter
+      } else {
+        // No db connection available for EmbeddingStore
       }
     }
     

@@ -69,20 +69,29 @@ export class EmbeddingStore {
     } else {
       this.mode = 'sqlite';
       this.db = backend.db;
+      
+      // db adapter should have required methods (provided by sqlite.ts)
     }
   }
 
   async initialize(): Promise<void> {
     if (this.mode === 'sqlite') {
       if (!this.db) throw new Error('SQLite database not initialized');
-      await this.db.exec(`
+      const sql = `
         CREATE TABLE IF NOT EXISTS memory_embeddings (
           memory_id TEXT PRIMARY KEY,
           vector BLOB NOT NULL,
           dimensions INTEGER NOT NULL,
           model_hint TEXT DEFAULT 'unknown'
         )
-      `);
+      `;
+      if (typeof this.db.exec === 'function') {
+        this.db.exec(sql);
+      } else if (typeof this.db.prepare === 'function') {
+        this.db.prepare(sql).run();
+      } else {
+        throw new Error('Database object has neither .exec() nor .prepare() method');
+      }
     }
     // Memory backend needs no initialization
   }
@@ -104,12 +113,23 @@ export class EmbeddingStore {
     }
 
     const blob = serializeVector(vector);
-    await this.db.run(
-      `INSERT OR REPLACE INTO memory_embeddings 
-       (memory_id, vector, dimensions, model_hint) 
-       VALUES (?, ?, ?, ?)`,
-      [memoryId, blob, vector.length, modelHint]
-    );
+    if (typeof this.db.run === 'function') {
+      await this.db.run(
+        `INSERT OR REPLACE INTO memory_embeddings 
+         (memory_id, vector, dimensions, model_hint) 
+         VALUES (?, ?, ?, ?)`,
+        [memoryId, blob, vector.length, modelHint]
+      );
+    } else if (typeof this.db.prepare === 'function') {
+      const stmt = this.db.prepare(`
+        INSERT OR REPLACE INTO memory_embeddings 
+        (memory_id, vector, dimensions, model_hint) 
+        VALUES (?, ?, ?, ?)
+      `);
+      stmt.run(memoryId, blob, vector.length, modelHint);
+    } else {
+      throw new Error('Database object has neither .run() nor .prepare() method');
+    }
   }
 
   async get(memoryId: string): Promise<EmbeddingRow | null> {
@@ -119,18 +139,31 @@ export class EmbeddingStore {
     }
 
     if (!this.db) throw new Error('SQLite database not initialized');
-    const row = await this.db.get(
-      'SELECT * FROM memory_embeddings WHERE memory_id = ?',
-      [memoryId]
-    );
-    if (!row) return null;
-
-    return {
-      memoryId: row.memory_id,
-      vector: deserializeVector(row.vector),
-      dimensions: row.dimensions,
-      modelHint: row.model_hint,
-    };
+    if (typeof this.db.get === 'function') {
+      const row = await this.db.get(
+        'SELECT * FROM memory_embeddings WHERE memory_id = ?',
+        [memoryId]
+      );
+      if (!row) return null;
+      return {
+        memoryId: row.memory_id,
+        vector: deserializeVector(row.vector),
+        dimensions: row.dimensions,
+        modelHint: row.model_hint,
+      };
+    } else if (typeof this.db.prepare === 'function') {
+      const stmt = this.db.prepare('SELECT * FROM memory_embeddings WHERE memory_id = ?');
+      const row = stmt.get(memoryId);
+      if (!row) return null;
+      return {
+        memoryId: row.memory_id,
+        vector: deserializeVector(row.vector),
+        dimensions: row.dimensions,
+        modelHint: row.model_hint,
+      };
+    } else {
+      throw new Error('Database object has neither .get() nor .prepare() method');
+    }
   }
 
   async getAllForSearch(
@@ -148,21 +181,40 @@ export class EmbeddingStore {
       return results;
     }
 
-    // For SQLite, join with memories table to exclude forgotten ones
+    // For SQLite, join with memories table to exclude deleted ones
     if (!this.db) throw new Error('SQLite database not initialized');
-    const rows = await this.db.all(`
-      SELECT e.memory_id, e.vector, e.dimensions, e.model_hint
-      FROM memory_embeddings e
-      JOIN memories m ON e.memory_id = m.id
-      WHERE m.forgotten = 0
-    `);
-
-    return rows.map((row: any) => ({
-      memoryId: row.memory_id,
-      vector: deserializeVector(row.vector),
-      dimensions: row.dimensions,
-      modelHint: row.model_hint,
-    }));
+    // Check if db has all method (better-sqlite3 Database)
+    if (typeof this.db.all === 'function') {
+      const rows = await this.db.all(`
+        SELECT e.memory_id, e.vector, e.dimensions, e.model_hint
+        FROM memory_embeddings e
+        JOIN memories m ON e.memory_id = m.id
+        WHERE m.is_deleted = 0
+      `);
+      return rows.map((row: any) => ({
+        memoryId: row.memory_id,
+        vector: deserializeVector(row.vector),
+        dimensions: row.dimensions,
+        modelHint: row.model_hint,
+      }));
+    } else if (typeof this.db.prepare === 'function') {
+      // Use prepare pattern (better-sqlite3 Database)
+      const stmt = this.db.prepare(`
+        SELECT e.memory_id, e.vector, e.dimensions, e.model_hint
+        FROM memory_embeddings e
+        JOIN memories m ON e.memory_id = m.id
+        WHERE m.is_deleted = 0
+      `);
+      const rows = stmt.all();
+      return rows.map((row: any) => ({
+        memoryId: row.memory_id,
+        vector: deserializeVector(row.vector),
+        dimensions: row.dimensions,
+        modelHint: row.model_hint,
+      }));
+    } else {
+      throw new Error('Database object has neither .all() nor .prepare() method');
+    }
   }
 
   async delete(memoryId: string): Promise<void> {
@@ -173,10 +225,17 @@ export class EmbeddingStore {
     }
 
     if (!this.db) throw new Error('SQLite database not initialized');
-    await this.db.run(
-      'DELETE FROM memory_embeddings WHERE memory_id = ?',
-      [memoryId]
-    );
+    if (typeof this.db.run === 'function') {
+      await this.db.run(
+        'DELETE FROM memory_embeddings WHERE memory_id = ?',
+        [memoryId]
+      );
+    } else if (typeof this.db.prepare === 'function') {
+      const stmt = this.db.prepare('DELETE FROM memory_embeddings WHERE memory_id = ?');
+      stmt.run(memoryId);
+    } else {
+      throw new Error('Database object has neither .run() nor .prepare() method');
+    }
   }
 
   async count(): Promise<number> {
@@ -186,10 +245,18 @@ export class EmbeddingStore {
     }
 
     if (!this.db) throw new Error('SQLite database not initialized');
-    const row = await this.db.get(
-      'SELECT COUNT(*) as cnt FROM memory_embeddings'
-    );
-    return row.cnt;
+    if (typeof this.db.get === 'function') {
+      const row = await this.db.get(
+        'SELECT COUNT(*) as cnt FROM memory_embeddings'
+      );
+      return row.cnt;
+    } else if (typeof this.db.prepare === 'function') {
+      const stmt = this.db.prepare('SELECT COUNT(*) as cnt FROM memory_embeddings');
+      const row = stmt.get();
+      return row.cnt;
+    } else {
+      throw new Error('Database object has neither .get() nor .prepare() method');
+    }
   }
 
   async clear(): Promise<void> {
@@ -200,7 +267,14 @@ export class EmbeddingStore {
     }
 
     if (!this.db) throw new Error('SQLite database not initialized');
-    await this.db.run('DELETE FROM memory_embeddings');
+    if (typeof this.db.run === 'function') {
+      await this.db.run('DELETE FROM memory_embeddings');
+    } else if (typeof this.db.prepare === 'function') {
+      const stmt = this.db.prepare('DELETE FROM memory_embeddings');
+      stmt.run();
+    } else {
+      throw new Error('Database object has neither .run() nor .prepare() method');
+    }
   }
 
   async getAll(): Promise<EmbeddingRow[]> {
@@ -210,15 +284,28 @@ export class EmbeddingStore {
     }
 
     if (!this.db) throw new Error('SQLite database not initialized');
-    const rows = await this.db.all(
-      'SELECT * FROM memory_embeddings'
-    );
-
-    return rows.map((row: any) => ({
-      memoryId: row.memory_id,
-      vector: deserializeVector(row.vector),
-      dimensions: row.dimensions,
-      modelHint: row.model_hint,
-    }));
+    // Check if db has all method
+    if (typeof this.db.all === 'function') {
+      const rows = await this.db.all(
+        'SELECT * FROM memory_embeddings'
+      );
+      return rows.map((row: any) => ({
+        memoryId: row.memory_id,
+        vector: deserializeVector(row.vector),
+        dimensions: row.dimensions,
+        modelHint: row.model_hint,
+      }));
+    } else if (typeof this.db.prepare === 'function') {
+      const stmt = this.db.prepare('SELECT * FROM memory_embeddings');
+      const rows = stmt.all();
+      return rows.map((row: any) => ({
+        memoryId: row.memory_id,
+        vector: deserializeVector(row.vector),
+        dimensions: row.dimensions,
+        modelHint: row.model_hint,
+      }));
+    } else {
+      throw new Error('Database object has neither .all() nor .prepare() method');
+    }
   }
 }

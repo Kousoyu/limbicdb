@@ -67,10 +67,13 @@ describeWithBackends('LimbicDB Contract Tests', (createDb) => {
       expect(results.some(m => m.content.includes('This is a test'))).toBe(true)
     })
 
-    // Note: Chinese/Unicode search support depends on FTS5 configuration
-    // Currently may have limitations with CJK characters
-    it.skip('should support Unicode/Chinese character matching (if configured)', async () => {
-      // This test is skipped as Chinese search requires additional FTS5 configuration
+    // Note: Chinese/Unicode search support is tracked in Issue #6
+    // Current implementation has basic CJK support via FTS5 + LIKE fallback
+    // but may not match partial characters within multi-character terms
+    it.skip('should support Unicode/Chinese character matching (tracked in #6)', async () => {
+      // This test is skipped pending CJK search improvements in Issue #6
+      // Current status: basic CJK search works via FTS5 + LIKE fallback
+      // but this test expects more advanced matching capabilities
       // Arrange
       await db.remember('这是一个测试记忆')
       await db.remember('另一个记忆')
@@ -80,6 +83,7 @@ describeWithBackends('LimbicDB Contract Tests', (createDb) => {
       const results = (await db.recall('测试')).memories
 
       // Assert
+      // With improved CJK support, should find both memories containing '测试'
       expect(results.length).toBeGreaterThanOrEqual(2)
     })
   })

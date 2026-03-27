@@ -651,6 +651,11 @@ export class SQLiteStore implements IStorage {
     this.db.close()
   }
   
+  // Get the raw database connection (for EmbeddingStore)
+  getRawDb(): any {
+    return this.db
+  }
+  
   // --- Snapshot Restoration ---
   async restoreFromSnapshot(snapshotData: SnapshotData): Promise<void> {
     return this.transaction(() => {

@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest'
 import fs from 'fs'
 import { open, openMemory, openSQLite } from '../src/index'
+import { cosineSimilarity, serializeVector, deserializeVector } from '../src/embedding-store'
 import type { LimbicDB, Embedder, RecallResult } from '../src/types'
 
 // Helper to run tests with both backends
@@ -127,15 +128,58 @@ describeWithBackends('LimbicDB Semantic Search Tests', (createDb) => {
   })
 
   describe('vector consistency', () => {
-    it.skip('should serialize and deserialize vectors with minimal precision loss', async () => {
-      // This test requires actual implementation to test
-      // For now, it's a placeholder
-      // TODO: Implement when vector serialization is properly implemented
+    it('should serialize and deserialize vectors with minimal precision loss', async () => {
+      // Create a test vector
+      const originalVector = [1.0, 2.0, 3.0, 0.5, -0.5, 0.0]
+      
+      // Serialize to buffer
+      const buffer = serializeVector(originalVector)
+      
+      // Deserialize back
+      const deserializedVector = deserializeVector(buffer)
+      
+      // Should have same length
+      expect(deserializedVector.length).toBe(originalVector.length)
+      
+      // Should have minimal precision loss (Float32Array precision)
+      for (let i = 0; i < originalVector.length; i++) {
+        // Allow for floating point precision differences
+        expect(deserializedVector[i]).toBeCloseTo(originalVector[i], 6)
+      }
     })
 
-    it.skip('should compute consistent cosine similarity', async () => {
-      // Test cosine similarity utility function
-      // TODO: Implement when cosine similarity utility is exposed for testing
+    it('should compute consistent cosine similarity', async () => {
+      // Test cases for cosine similarity
+      const testCases = [
+        {
+          a: [1, 0, 0],
+          b: [1, 0, 0],
+          expected: 1.0 // Same vector
+        },
+        {
+          a: [1, 0, 0],
+          b: [0, 1, 0],
+          expected: 0.0 // Orthogonal vectors
+        },
+        {
+          a: [1, 1, 0],
+          b: [1, 1, 0],
+          expected: 1.0 // Same direction
+        },
+        {
+          a: [1, 2, 3],
+          b: [4, 5, 6],
+          expected: 0.974631846 // Calculated separately
+        }
+      ]
+      
+      for (const testCase of testCases) {
+        const similarity = cosineSimilarity(testCase.a, testCase.b)
+        expect(similarity).toBeCloseTo(testCase.expected, 6)
+      }
+      
+      // Test error handling for dimension mismatch
+      expect(() => cosineSimilarity([1, 2], [1, 2, 3])).toThrow('Vector dimension mismatch')
     })
   })
 
