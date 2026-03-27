@@ -62,6 +62,24 @@ await memory.close()
 * **Model-agnostic**
  Useful without a specific model provider, with optional enhancements when available.
 
+## Known Limitations (Alpha)
+
+LimbicDB 0.3.0-alpha is focused on establishing reliable foundations. Current limitations include:
+
+* **Chinese / CJK search support is limited**  
+  FTS5 default configuration has limitations with CJK characters; search may not match partial words or characters within multi-character terms.
+
+* **Partial word matching not guaranteed**  
+  Searching for "test" may not match "testing" or "tested" depending on exact FTS configuration.
+
+* **Current search is keyword-based, not semantic**  
+  `recall()` uses local text matching and ranking, not embedding-based semantic search.
+
+* **Memory format stability**  
+  The `.limbic` file format may change between alpha releases.
+
+These limitations are documented for transparency. Future releases will address them based on user feedback.
+
 ## Roadmap Direction
 
 LimbicDB is evolving toward a reliable memory runtime with:
