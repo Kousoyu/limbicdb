@@ -110,8 +110,13 @@ To avoid confusion between what's implemented today and what's planned for the f
 * **Inspectability depth** - Understanding why memories were recalled
 * **Compaction behavior** - Noise reduction and long-term memory consolidation
 
+### Experimental (improving, may change)
+* **Embedding / semantic recall** - Vector-based similarity search (bring-your-own embedder, v0.4 alpha)
+* **CJK search enhancement** - Hybrid FTS5 + LIKE fallback for Chinese/Japanese/Korean text
+* **Inspectability depth** - Understanding why memories were recalled
+* **Compaction behavior** - Noise reduction and long-term memory consolidation
+
 ### Planned (not yet implemented)
-* **Embedding / semantic recall** - Vector-based similarity search
 * **Richer explanation APIs** - Deeper insights into memory decisions
 * **Stronger file format guarantees** - Stable `.limbic` format across versions
 * **Advanced retention policies** - Sophisticated decay and pruning strategies
@@ -126,7 +131,7 @@ To set clear expectations about what kind of search works today:
 | **Chinese/CJK exact term** | 🔄 Improving | Hybrid FTS5 + LIKE fallback in alpha.2 |
 | **Chinese/CJK partial match** | 🧪 Experimental | Limited support via LIKE fallback |
 | **Mixed CJK + English** | 🧪 Experimental | Works but ranking may be suboptimal |
-| **Semantic/embedding search** | 📋 Planned | Not yet implemented |
+| **Semantic/embedding search** | 🧪 Experimental (bring-your-own embedder) | Memory backend fully implemented, SQLite backend stores embeddings (search in progress) |
 
 **Status Key:**
 * ✅ **Stable** - Reliable, tested, ready for use
@@ -144,6 +149,31 @@ LimbicDB is evolving toward a reliable memory runtime with:
 * compaction for long-lived memory stores
 * stable local file formats for embedded use
 
+## How LimbicDB compares
+
+LimbicDB is not a vector database. It's a memory lifecycle engine. 
+This table helps you decide if it fits your use case.
+
+| | LimbicDB | Mem0 | LangChain Memory | ChromaDB | Raw JSON files |
+|---|---|---|---|---|---|
+| **What it is** | Memory lifecycle engine | Memory-as-a-service | Memory modules for chains | Vector database | DIY |
+| **Local, no server** | ✅ Single `.limbic` file | ⚠️ Has local mode, but designed for cloud | ✅ | ✅ | ✅ |
+| **No API keys needed** | ✅ | ❌ (cloud) / ✅ (local) | ✅ | ✅ | ✅ |
+| **Semantic search** | 🧪 Experimental (bring-your-own embedder) | ✅ Built-in | ✅ Via vector stores | ✅ Core feature | ❌ |
+| **Keyword search** | ✅ FTS5 + LIKE fallback | ✅ | ✅ | ⚠️ Limited | ❌ |
+| **Memory decay / forgetting** | ✅ Half-life model | ⚠️ Basic | ❌ | ❌ | ❌ |
+| **Auto-classification** | ✅ fact/episode/preference/procedure/goal | ❌ | ❌ | ❌ | ❌ |
+| **Full operation history** | ✅ Auditable timeline | ❌ | ❌ | ❌ | ❌ |
+| **One-file portable** | ✅ Copy/backup one file | ❌ | ❌ | ❌ | ✅ |
+| **Language** | TypeScript/JS | Python | Python | Python/JS | Any |
+| **Maturity** | Alpha | Production | Production | Production | N/A |
+
+**Choose LimbicDB if:** You need a local, portable, inspectable memory store for a single agent, and you care about memory lifecycle (decay, forgetting, auditing) more than raw vector search performance.
+
+**Don't choose LimbicDB if:** You need production-grade semantic search today, Python-native integration, or cloud-scale multi-tenant memory. Use Mem0, Chroma, or LangChain Memory instead.
+
+> We'd rather you pick the right tool than pick us. If LimbicDB isn't right for your case, these alternatives are genuinely good.
+
 ## Relationship to CogniCore
 
 LimbicDB focuses on **memory**.
@@ -153,6 +183,8 @@ If you use both together:
 
 * **CogniCore** decides how the agent runs
 * **LimbicDB** decides how memory is stored, recalled, and maintained
+
+**Important:** LimbicDB and CogniCore are **separate, independently versioned projects**. You can use LimbicDB without CogniCore, and vice versa.
 
 ---
 
@@ -289,6 +321,38 @@ const devDb = openMemory(':memory:')
 // Force SQLite backend (production)
 const prodDb = openSQLite('./agent.limbic')
 ```
+
+### Semantic Search Example
+
+LimbicDB v0.4 adds semantic search support with bring-your-own embedder:
+
+```typescript
+import { open } from 'limbicdb'
+
+// Open with your embedding function
+const memory = open({
+  path: './agent.limbic',
+  embedder: {
+    async embed(text) {
+      // Use @xenova/transformers, OpenAI, Cohere, or any provider
+      // Return number[] vector
+      return computeEmbedding(text)
+    },
+    dimensions: 384
+  }
+})
+
+// Semantic recall finds meaning, not just keywords
+const results = await memory.recall('user interface preferences', {
+  mode: 'semantic', // or 'hybrid' or 'keyword'
+  limit: 5
+})
+
+console.log(`Mode: ${results.meta.mode}`)
+console.log(`Fallback: ${results.meta.fallback}`) // true if no embedder
+```
+
+See the full example: [`examples/semantic-recall.ts`](examples/semantic-recall.ts)
 
 ## License
 

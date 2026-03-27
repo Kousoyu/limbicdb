@@ -4,16 +4,20 @@ import type {
   Memory,
   RememberOptions,
   RecallOptions,
+  RecallResult,
+  RecallMode,
   ForgetFilter,
   HistoryOptions,
   LimbicDBStats,
   TimelineEvent,
-  DecayConfig
+  DecayConfig,
+  Embedder
 } from './types'
 import { classifyMemory, extractTags } from './classify'
 import { computeStrength, predictExpiry, suggestReviewTime } from './decay'
 import { parseTime } from './time'
 import { generateId, generateShortId } from './utils/id'
+import { EmbeddingStore, cosineSimilarity, type EmbeddingRow } from './embedding-store'
 
 const DEFAULT_DECAY_CONFIG = {
   enabled: true,
@@ -47,6 +51,11 @@ export class LimbicDBImpl implements LimbicDB {
   private timeline: TimelineEvent[] = []
   private snapshots = new Map<string, { data: any; createdAt: number }>()
   
+  // Embedding support
+  private embedder?: Embedder
+  private embeddingStore?: EmbeddingStore
+  private pendingEmbeddings = 0
+  
   private _stats: LimbicDBStats = {
     memoryCount: 0,
     stateKeyCount: 0,
@@ -56,10 +65,44 @@ export class LimbicDBImpl implements LimbicDB {
   
   constructor(config: Required<LimbicDBConfig>) {
     this.config = config
+    
+    // Initialize embedder if provided
+    this.embedder = config.embedder
+    if (this.embedder) {
+      this.embeddingStore = new EmbeddingStore({ type: 'memory' })
+      // Note: initialize() is async, but constructor can't be async
+      // We'll initialize lazily when needed
+    }
+    
     this.updateStats()
   }
   
-  private updateStats() {
+  private async ensureEmbeddingStoreInitialized(): Promise<void> {
+    if (this.embeddingStore) {
+      // EmbeddingStore.initialize() is idempotent
+      await this.embeddingStore.initialize()
+    }
+  }
+  
+  private async computeEmbeddingAsync(memoryId: string, content: string): Promise<void> {
+    if (!this.embedder || !this.embeddingStore) return
+    
+    try {
+      await this.ensureEmbeddingStoreInitialized()
+      const vector = await this.embedder.embed(content)
+      await this.embeddingStore.store(memoryId, vector, this.embedder.modelHint || 'user-provided')
+    } catch (err) {
+      // Log but don't throw. Memory is saved, embedding is best-effort.
+      if (typeof console !== 'undefined') {
+        console.warn(`[limbicdb] Embedding failed for memory ${memoryId}:`, 
+          err instanceof Error ? err.message : err)
+      }
+    } finally {
+      this.pendingEmbeddings--
+    }
+  }
+  
+  private async updateStats() {
     const stats: LimbicDBStats = {
       memoryCount: this.memories.size,
       stateKeyCount: this.state.size,
@@ -75,6 +118,19 @@ export class LimbicDBImpl implements LimbicDB {
     }
     if (newestAge !== undefined) {
       stats.newestMemoryAge = newestAge
+    }
+    
+    // Add embedding statistics if embedder is available
+    if (this.embeddingStore) {
+      try {
+        await this.ensureEmbeddingStoreInitialized()
+        stats.embeddingsCount = await this.embeddingStore.count()
+        if (this.embedder) {
+          stats.embeddingsDimensions = this.embedder.dimensions
+        }
+      } catch (err) {
+        // Silently fail - stats will not include embedding info
+      }
     }
     
     this._stats = stats
@@ -165,10 +221,79 @@ export class LimbicDBImpl implements LimbicDB {
     this.updateStats()
     this.recordTimelineEvent('memory', 'create', id, content)
     
+    // Async embedding (fire-and-forget)
+    if (this.embedder && this.embeddingStore) {
+      this.pendingEmbeddings++
+      this.computeEmbeddingAsync(id, content).catch(() => {
+        // Error already logged in computeEmbeddingAsync
+      })
+    }
+    
     return this.toPublicMemory(memory)
   }
   
-  async recall(query: string, options?: RecallOptions): Promise<Memory[]> {
+  async recall(query: string, options?: RecallOptions): Promise<RecallResult> {
+    const startTime = Date.now()
+    const mode = options?.mode || 'keyword'
+    
+    // Determine actual mode based on embedder availability
+    const actualMode: RecallMode = this.determineActualMode(mode)
+    const fallback = (mode === 'semantic' || mode === 'hybrid') && actualMode === 'keyword'
+    
+    let memories: Memory[] = []
+    let embedMs = 0
+    
+    if (actualMode === 'keyword') {
+      memories = await this.executeKeywordRecall(query, options)
+    } else if (actualMode === 'semantic') {
+      const result = await this.executeSemanticRecall(query, options)
+      memories = result.memories
+      embedMs = result.embedMs
+    } else if (actualMode === 'hybrid') {
+      const result = await this.executeHybridRecall(query, options)
+      memories = result.memories
+      embedMs = result.embedMs
+    }
+    
+    const searchMs = Date.now() - startTime
+    
+    // Record access event
+    this.recordTimelineEvent('memory', 'access', undefined, `Recalled: "${query.substring(0, 50)}" (${actualMode})`)
+    
+    return {
+      memories,
+      meta: {
+        mode: actualMode,
+        fallback,
+        pendingEmbeddings: this.pendingEmbeddings,
+        timing: {
+          searchMs,
+          embedMs
+        }
+      }
+    }
+  }
+  
+  private determineActualMode(requestedMode: RecallMode): RecallMode {
+    switch (requestedMode) {
+      case 'keyword':
+        return 'keyword'
+      case 'semantic':
+      case 'hybrid':
+        // Check if embedder is available
+        if (!this.embedder || !this.embeddingStore) {
+          return 'keyword' // fallback
+        }
+        return requestedMode
+      default:
+        return 'keyword'
+    }
+  }
+  
+  private async executeKeywordRecall(
+    query: string,
+    options?: RecallOptions
+  ): Promise<Memory[]> {
     const now = Date.now()
     const limit = options?.limit || 10
     const minStrength = options?.minStrength || 0.01
@@ -176,7 +301,6 @@ export class LimbicDBImpl implements LimbicDB {
     const tagsFilter = options?.tags
     const sinceFilter = options?.since ? parseTime(options.since) : undefined
     
-    // Simple keyword search (MVP - will be FTS5)
     const results: StoredMemory[] = []
     
     for (const memory of this.memories.values()) {
@@ -228,11 +352,221 @@ export class LimbicDBImpl implements LimbicDB {
       return b.accessedAt - a.accessedAt
     })
     
-    // Record access event
-    this.recordTimelineEvent('memory', 'access', undefined, `Recalled: "${query.substring(0, 50)}"`)
-    
-    // Return limited results
+    // Apply limit and convert to public format
     return results.slice(0, limit).map(mem => this.toPublicMemory(mem))
+  }
+  
+  private async executeSemanticRecall(
+    query: string,
+    options?: RecallOptions
+  ): Promise<{ memories: Memory[]; embedMs: number }> {
+    const embedStartTime = Date.now()
+    
+    // Compute query embedding
+    const queryVector = await this.embedder!.embed(query)
+    const embedMs = Date.now() - embedStartTime
+    
+    const now = Date.now()
+    const limit = options?.limit || 10
+    const minStrength = options?.minStrength || 0.01
+    const kindFilter = options?.kind
+    const tagsFilter = options?.tags
+    const sinceFilter = options?.since ? parseTime(options.since) : undefined
+    
+    // Get all available embeddings
+    await this.ensureEmbeddingStoreInitialized()
+    const embeddingRows = await this.embeddingStore!.getAllForSearch([])
+    
+    // Filter by memory-level criteria first
+    const candidateMemoryIds = new Set<string>()
+    for (const memory of this.memories.values()) {
+      if (memory.isDeleted) continue
+      if (memory.strength < minStrength) continue
+      
+      if (kindFilter) {
+        const kinds = Array.isArray(kindFilter) ? kindFilter : [kindFilter]
+        if (!kinds.includes(memory.kind)) continue
+      }
+      
+      if (tagsFilter && tagsFilter.length > 0) {
+        const hasAllTags = tagsFilter.every(tag => memory.tags.includes(tag))
+        if (!hasAllTags) continue
+      }
+      
+      if (sinceFilter && memory.createdAt < sinceFilter) continue
+      
+      candidateMemoryIds.add(memory.id)
+    }
+    
+    // Filter embeddings to only include candidates
+    const candidateEmbeddings = embeddingRows.filter(row => candidateMemoryIds.has(row.memoryId))
+    
+    // Compute similarities
+    const similarities: Array<{ memoryId: string; similarity: number }> = []
+    for (const row of candidateEmbeddings) {
+      // Check vector dimension compatibility
+      if (row.vector.length !== queryVector.length) {
+        // This shouldn't happen if using same embedder, but just in case
+        continue
+      }
+      
+      const similarity = cosineSimilarity(row.vector, queryVector)
+      if (similarity > 0) { // Only include positive similarities
+        similarities.push({
+          memoryId: row.memoryId,
+          similarity
+        })
+      }
+    }
+    
+    // Sort by similarity (descending)
+    similarities.sort((a, b) => b.similarity - a.similarity)
+    
+    // Get memories and update access stats
+    const results: Memory[] = []
+    for (const item of similarities.slice(0, limit)) {
+      const memory = this.memories.get(item.memoryId)
+      if (!memory) continue
+      
+      // Update access stats
+      memory.accessCount++
+      memory.accessedAt = now
+      memory.strength = computeStrength(
+        memory.baseStrength,
+        memory.createdAt,
+        now,
+        memory.accessCount,
+        this.config.decay as DecayConfig,
+        now
+      )
+      
+      results.push(this.toPublicMemory(memory))
+    }
+    
+    return { memories: results, embedMs }
+  }
+  
+  private async executeHybridRecall(
+    query: string,
+    options?: RecallOptions
+  ): Promise<{ memories: Memory[]; embedMs: number }> {
+    const embedStartTime = Date.now()
+    
+    // Compute query embedding
+    const queryVector = await this.embedder!.embed(query)
+    const embedMs = Date.now() - embedStartTime
+    
+    const now = Date.now()
+    const limit = options?.limit || 10
+    const minStrength = options?.minStrength || 0.01
+    const kindFilter = options?.kind
+    const tagsFilter = options?.tags
+    const sinceFilter = options?.since ? parseTime(options.since) : undefined
+    
+    // Get all available embeddings
+    await this.ensureEmbeddingStoreInitialized()
+    const embeddingRows = await this.embeddingStore!.getAllForSearch([])
+    
+    // Filter by memory-level criteria
+    const candidateMemoryIds = new Set<string>()
+    const candidateMemories: StoredMemory[] = []
+    
+    for (const memory of this.memories.values()) {
+      if (memory.isDeleted) continue
+      if (memory.strength < minStrength) continue
+      
+      if (kindFilter) {
+        const kinds = Array.isArray(kindFilter) ? kindFilter : [kindFilter]
+        if (!kinds.includes(memory.kind)) continue
+      }
+      
+      if (tagsFilter && tagsFilter.length > 0) {
+        const hasAllTags = tagsFilter.every(tag => memory.tags.includes(tag))
+        if (!hasAllTags) continue
+      }
+      
+      if (sinceFilter && memory.createdAt < sinceFilter) continue
+      
+      candidateMemoryIds.add(memory.id)
+      candidateMemories.push(memory)
+    }
+    
+    // Compute keyword scores (simple presence)
+    const keywordScores = new Map<string, number>()
+    const queryLower = query.toLowerCase()
+    
+    for (const memory of candidateMemories) {
+      let score = 0
+      if (memory.content.toLowerCase().includes(queryLower)) {
+        score = 1.0 // Exact match
+      } else {
+        // Partial matching (simplified)
+        const words = queryLower.split(/\s+/).filter(w => w.length > 2)
+        const contentLower = memory.content.toLowerCase()
+        const matchedWords = words.filter(w => contentLower.includes(w)).length
+        score = matchedWords / Math.max(1, words.length)
+      }
+      keywordScores.set(memory.id, score)
+    }
+    
+    // Compute semantic similarities
+    const semanticScores = new Map<string, number>()
+    const candidateEmbeddings = embeddingRows.filter(row => candidateMemoryIds.has(row.memoryId))
+    
+    for (const row of candidateEmbeddings) {
+      if (row.vector.length !== queryVector.length) continue
+      
+      const similarity = cosineSimilarity(row.vector, queryVector)
+      // Normalize to 0-1 range (cosine similarity is -1 to 1)
+      const normalized = (similarity + 1) / 2
+      semanticScores.set(row.memoryId, normalized)
+    }
+    
+    // Combine scores (70% semantic, 30% keyword)
+    const combinedScores = new Map<string, number>()
+    
+    for (const memoryId of candidateMemoryIds) {
+      const keywordScore = keywordScores.get(memoryId) || 0
+      const semanticScore = semanticScores.get(memoryId) || 0
+      
+      // Hardcoded weights as per design
+      const combined = (semanticScore * 0.7) + (keywordScore * 0.3)
+      combinedScores.set(memoryId, combined)
+    }
+    
+    // Sort by combined score
+    const sortedMemoryIds = Array.from(candidateMemoryIds).sort((a, b) => {
+      return (combinedScores.get(b) || 0) - (combinedScores.get(a) || 0)
+    })
+    
+    // Get top results and update access stats
+    const results: Memory[] = []
+    for (const memoryId of sortedMemoryIds.slice(0, limit)) {
+      const memory = this.memories.get(memoryId)
+      if (!memory) continue
+      
+      // Update access stats
+      memory.accessCount++
+      memory.accessedAt = now
+      memory.strength = computeStrength(
+        memory.baseStrength,
+        memory.createdAt,
+        now,
+        memory.accessCount,
+        this.config.decay as DecayConfig,
+        now
+      )
+      
+      results.push(this.toPublicMemory(memory))
+    }
+    
+    return { memories: results, embedMs }
+  }
+  
+  // Legacy method for backward compatibility
+  async recallLegacy(query: string, options?: RecallOptions): Promise<Memory[]> {
+    const result = await this.recall(query, options)
+    return result.memories
   }
   
   async forget(filter: ForgetFilter): Promise<number> {
@@ -263,6 +597,19 @@ export class LimbicDBImpl implements LimbicDB {
       // Soft delete
       memory.isDeleted = true
       count++
+      
+      // Also delete embedding if exists
+      if (this.embeddingStore) {
+        try {
+          await this.embeddingStore.delete(id)
+        } catch (err) {
+          // Log but continue
+          if (typeof console !== 'undefined') {
+            console.warn(`[limbicdb] Failed to delete embedding for ${id}:`, 
+              err instanceof Error ? err.message : err)
+          }
+        }
+      }
       
       this.recordTimelineEvent('memory', 'delete', id, memory.content.substring(0, 100))
     }
@@ -336,10 +683,22 @@ export class LimbicDBImpl implements LimbicDB {
     const id = generateShortId()
     const now = Date.now()
     
+    // Collect embeddings if available
+    let embeddings: EmbeddingRow[] = []
+    if (this.embeddingStore) {
+      try {
+        await this.ensureEmbeddingStoreInitialized()
+        embeddings = await this.embeddingStore.getAll()
+      } catch (err) {
+        // Silently fail - snapshot will still work without embeddings
+      }
+    }
+    
     const snapshotData = {
       memories: Array.from(this.memories.entries()),
       state: Array.from(this.state.entries()),
       timeline: this.timeline,
+      embeddings,
       createdAt: now,
     }
     
@@ -364,9 +723,12 @@ export class LimbicDBImpl implements LimbicDB {
     this.memories.clear()
     this.state.clear()
     this.timeline = []
+    if (this.embeddingStore) {
+      await this.embeddingStore.clear()
+    }
     
     // Restore from snapshot
-    const { memories, state, timeline } = snapshot.data
+    const { memories, state, timeline, embeddings } = snapshot.data
     for (const [id, memory] of memories) {
       this.memories.set(id, memory as StoredMemory)
     }
@@ -374,6 +736,26 @@ export class LimbicDBImpl implements LimbicDB {
       this.state.set(key, value)
     }
     this.timeline = timeline
+    
+    // Restore embeddings if available
+    if (embeddings && this.embeddingStore) {
+      try {
+        await this.ensureEmbeddingStoreInitialized()
+        for (const embedding of embeddings) {
+          await this.embeddingStore.store(
+            embedding.memoryId,
+            embedding.vector,
+            embedding.modelHint
+          )
+        }
+      } catch (err) {
+        // Log but continue
+        if (typeof console !== 'undefined') {
+          console.warn('[limbicdb] Failed to restore embeddings from snapshot:', 
+            err instanceof Error ? err.message : err)
+        }
+      }
+    }
     
     this.updateStats()
     this.recordTimelineEvent('snapshot', 'access', snapshotId, `Restored snapshot ${snapshotId}`)

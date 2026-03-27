@@ -5,6 +5,88 @@ All notable changes to LimbicDB will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.4.0-alpha.1] - 2026-03-27
+
+### 🧠 Semantic Search Prototype (Bring-Your-Own Embedder)
+This alpha release introduces semantic search capabilities to LimbicDB, proving the architecture is feasible and extensible. The key insight: **semantic search is the watershed moment from "keyword memory" to "cognitive memory"**.
+
+### Added
+- **Semantic search interface**: New `mode` parameter for `recall()`: `keyword` | `semantic` | `hybrid`
+- **Embedder configuration**: User provides embedding function (e.g., @xenova/transformers, OpenAI, Cohere)
+- **Vector storage layer** (`src/embedding-store.ts`):
+  - Vector math utilities: `cosineSimilarity`, `serializeVector`, `deserializeVector`
+  - `EmbeddingStore` class with dual backend support (memory + SQLite)
+  - BLOB storage for vectors (384-dim = 1536 bytes vs ~3KB JSON)
+  - No vector index – brute-force cosine similarity (<10K memories is fast enough)
+- **Memory backend (complete implementation)**:
+  - Full semantic search via cosine similarity
+  - Hybrid search with hardcoded weights: 30% keyword + 70% semantic
+  - Graceful degradation: semantic/hybrid → keyword fallback when no embedder
+  - Async embedding computation (fire-and-forget, eventual consistency)
+- **SQLite backend (basic integration)**:
+  - Embedding storage support via `memory_embeddings` table
+  - Async embedding computation
+  - Embedding statistics in `stats` (`embeddingsCount`, `embeddingsDimensions`)
+  - Semantic/hybrid modes marked "TODO" – currently fall back to keyword
+- **Updated statistics**: `stats.embeddingsCount` and `stats.embeddingsDimensions` when embedder available
+- **Comprehensive tests**:
+  - Vector math tests (16 tests in `test/embedding-store.test.ts`)
+  - Semantic search test suite (30 tests in `test/semantic.test.ts`)
+  - All 92 tests pass (90 passed, 2 skipped)
+- **Enhanced example**: `examples/semantic-recall.ts` shows real usage with @xenova/transformers or mock embedder
+
+### Changed
+- **Backward compatible**: Existing code works unchanged (`recall()` returns `RecallResult`, `recallLegacy()` available)
+- **Type definitions extended**: `EmbedFn`, `Embedder`, `RecallResult`, `RecallMode` added to `src/types.ts`
+- **`RecallResult` structure**: Now includes `meta` field with mode, fallback flag, timing, pending embeddings
+- **`remember()` behavior**: Asynchronous embedding computation (doesn't block, eventual consistency)
+- **`forget()` behavior**: Also deletes associated embeddings (when embedding store exists)
+
+### Design Decisions
+- **Extreme interface simplification**: Removed `similarityThreshold` and `useHybrid` – first version proves architecture
+- **Hardcoded hybrid weights**: 30% keyword + 70% semantic (simple, works, can be configurable later)
+- **Brute-force vector search**: No sqlite-vss dependency, avoids compilation/cross-platform issues
+- **User provides embedder**: No built-in models – you control your data and compute
+- **Async embedding**: `remember()` doesn't block, embeddings may not be immediately available for search
+- **Graceful degradation**: Semantic/hybrid requests without embedder → keyword search + `fallback: true`
+- **Error handling**: Embedding failures logged but don't break memory storage
+
+### Known Limitations (Alpha Phase)
+- **SQLite backend semantic search**: Currently only stores embeddings, semantic/hybrid modes fall back to keyword
+- **Performance**: Brute-force cosine similarity may slow down with >10K memories
+- **No vector indexing**: Simple linear search, no approximate nearest neighbor
+- **Embedding dimension consistency**: User must ensure same embedder dimensions across sessions
+- **Snapshot/restore**: Embeddings not yet included in snapshots
+
+### Upgrading from 0.3.x
+1. No breaking changes – existing code continues to work
+2. To use semantic search: provide an `embedder` in config
+3. Results from `recall()` now have `meta` field – use `.memories` to get array
+4. For backward compatibility, use `recallLegacy()` to get plain `Memory[]`
+
+### Example Usage
+```typescript
+import { open } from 'limbicdb';
+import { pipeline } from '@xenova/transformers';
+
+const extractor = await pipeline('feature-extraction', 'Xenova/all-MiniLM-L6-v2');
+async function embed(text: string) {
+  const result = await extractor(text, { pooling: 'mean', normalize: true });
+  return Array.from(result.data);
+}
+
+const memory = open({
+  path: ':memory:',
+  embedder: { embed, dimensions: 384, modelHint: 'all-MiniLM-L6-v2' }
+});
+
+await memory.remember('User prefers dark mode in all applications');
+const result = await memory.recall('UI preferences', { mode: 'semantic' });
+// Finds "dark mode" memory even though query has no keyword overlap
+```
+
+---
+
 ## [0.3.0-alpha.2] - 2026-03-27
 
 ### 🔧 Chinese Search Enhancement Patch

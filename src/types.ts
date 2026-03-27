@@ -10,7 +10,8 @@
 export type MemoryKind = 'fact' | 'episode' | 'preference' | 'procedure' | 'goal'
 export type TimelineAction = 'create' | 'update' | 'delete' | 'access'
 export type TimelineType = 'memory' | 'state' | 'snapshot'
-export type RecallStrategy = 'keyword' | 'semantic' | 'hybrid'
+export type RecallStrategy = 'keyword' | 'semantic' | 'hybrid' // Deprecated, use mode
+export type RecallMode = 'keyword' | 'semantic' | 'hybrid'
 
 export interface Memory {
   id: string
@@ -24,6 +25,8 @@ export interface Memory {
   accessedAt: number // Last recall time
   accessCount: number
   baseStrength?: number  // Initial strength (0-1)
+  // Optional score for recall results
+  score?: number // 0-1 relevance score
 }
 
 export interface TimelineEvent {
@@ -41,8 +44,30 @@ export interface RecallOptions {
   kind?: MemoryKind | MemoryKind[]
   tags?: string[]
   since?: string | number  // '2h ago' or timestamp
-  strategy?: RecallStrategy  // default: 'hybrid'
-  semanticThreshold?: number  // 0-1, default: 0.7
+  
+  // Mode of recall: keyword (FTS5), semantic (embeddings), or hybrid (both)
+  // Default: 'keyword' if no embedder configured, otherwise 'hybrid'
+  mode?: RecallMode
+  
+  // Deprecated, use mode instead
+  strategy?: RecallStrategy  // default: 'keyword' (for backward compatibility)
+  
+  // For semantic/hybrid mode: minimum similarity threshold (0-1)
+  // Default: 0.3
+  similarityThreshold?: number
+}
+
+export interface RecallResult {
+  memories: Memory[]
+  meta: {
+    mode: RecallMode
+    fallback: boolean // true if requested semantic/hybrid but fell back to keyword
+    pendingEmbeddings?: number // number of memories still waiting for embedding computation
+    timing: {
+      embedMs?: number // time spent computing query embedding (semantic/hybrid only)
+      searchMs: number // time spent searching
+    }
+  }
 }
 
 export interface RememberOptions {
@@ -96,9 +121,13 @@ export interface LimbicDBConfig {
   }
 }
 
+// Embedding function type
+export type EmbedFn = (text: string) => Promise<number[]> | number[]
+
 export interface Embedder {
-  embed(text: string): Promise<Float32Array>
+  embed: EmbedFn
   dimensions: number
+  modelHint?: string // For cache invalidation when switching models
 }
 
 export interface LimbicDBStats {
@@ -108,12 +137,21 @@ export interface LimbicDBStats {
   dbSizeBytes: number
   oldestMemoryAge?: number  // ms
   newestMemoryAge?: number  // ms
+  // Embedding statistics (if embeddings are enabled)
+  embeddingsCount?: number
+  embeddingsDimensions?: number
 }
 
 export interface LimbicDB {
   // --- Memory Operations ---
   remember(content: string, options?: RememberOptions): Promise<Memory>
-  recall(query: string, options?: RecallOptions): Promise<Memory[]>
+  
+  // Enhanced recall with detailed results
+  recall(query: string, options?: RecallOptions): Promise<RecallResult>
+  
+  // Legacy recall for backward compatibility (returns just memories)
+  recallLegacy?(query: string, options?: RecallOptions): Promise<Memory[]>
+  
   forget(filter: ForgetFilter): Promise<number>  // returns number forgotten
   
   // --- State Operations ---
@@ -131,6 +169,16 @@ export interface LimbicDB {
   
   // --- Statistics ---
   readonly stats: LimbicDBStats
+  
+  // --- Embedding Operations ---
+  // Check if embeddings are available
+  hasEmbeddings?(): boolean
+  
+  // Manually trigger embedding computation for a memory
+  computeEmbedding?(memoryId: string): Promise<void>
+  
+  // Compute embeddings for all memories without embeddings
+  computeAllEmbeddings?(): Promise<number> // returns count of computed embeddings
 }
 
 // Factory function type

@@ -113,7 +113,7 @@ LimbicDB 目前仍处于 alpha 阶段。
 * **压缩整理行为** - 噪声减少和长期记忆整合
 
 ### 计划中（尚未实现）
-* **嵌入/语义召回** - 基于向量的相似性搜索
+* **嵌入/语义召回** - 基于向量的相似性搜索 (v0.4, 接口就绪)
 * **更丰富的解释 API** - 对记忆决策的深入洞察
 * **更强的文件格式保证** - 跨版本稳定的 `.limbic` 格式
 * **高级保留策略** - 复杂的衰减和清理策略
@@ -128,7 +128,7 @@ LimbicDB 目前仍处于 alpha 阶段。
 | **中文/CJK 精确词** | 🔄 改进中 | alpha.2 中的混合 FTS5 + LIKE 回退 |
 | **中文/CJK 部分匹配** | 🧪 实验性 | 通过 LIKE 回退提供有限支持 |
 | **中英混合查询** | 🧪 实验性 | 可用但排序可能不理想 |
-| **语义/嵌入搜索** | 📋 计划中 | 尚未实现 |
+| **语义/嵌入搜索** | 🔄 v0.4 (自带嵌入函数) | 接口已设计，实现进行中 |
 
 **状态说明：**
 * ✅ **稳定** - 可靠、经过测试、可使用
@@ -146,6 +146,31 @@ LimbicDB 正在朝着一个更可靠的 memory runtime 演进，包括：
 * 面向长期使用的 compact 能力
 * 面向嵌入式场景的稳定本地文件格式
 
+## LimbicDB 与其他方案的对比
+
+LimbicDB 不是向量数据库。它是一个记忆生命周期引擎。
+此表格帮助你判断它是否适合你的使用场景。
+
+| | LimbicDB | Mem0 | LangChain Memory | ChromaDB | 原始 JSON 文件 |
+|---|---|---|---|---|---|
+| **定位** | 记忆生命周期引擎 | 记忆即服务 | 链的记忆模块 | 向量数据库 | DIY |
+| **本地无服务端** | ✅ 单 `.limbic` 文件 | ⚠️ 有本地模式，但设计用于云端 | ✅ | ✅ | ✅ |
+| **无需 API 密钥** | ✅ | ❌ (云端) / ✅ (本地) | ✅ | ✅ | ✅ |
+| **语义搜索** | 🔄 v0.4 (自带嵌入函数) | ✅ 内置 | ✅ 通过向量存储 | ✅ 核心功能 | ❌ |
+| **关键词搜索** | ✅ FTS5 + LIKE 回退 | ✅ | ✅ | ⚠️ 有限支持 | ❌ |
+| **记忆衰减/遗忘** | ✅ 半衰期模型 | ⚠️ 基础功能 | ❌ | ❌ | ❌ |
+| **自动分类** | ✅ 事实/经历/偏好/流程/目标 | ❌ | ❌ | ❌ | ❌ |
+| **完整操作历史** | ✅ 可审计时间线 | ❌ | ❌ | ❌ | ❌ |
+| **单文件便携** | ✅ 复制/备份一个文件 | ❌ | ❌ | ❌ | ✅ |
+| **语言** | TypeScript/JS | Python | Python | Python/JS | 任意 |
+| **成熟度** | Alpha | 生产环境 | 生产环境 | 生产环境 | N/A |
+
+**选择 LimbicDB 如果：** 你需要一个本地、便携、可检查的记忆存储用于单个 Agent，并且你更关心记忆生命周期（衰减、遗忘、审计）而不是原始向量搜索性能。
+
+**不要选择 LimbicDB 如果：** 你今天就需要生产级的语义搜索、Python 原生集成，或云端规模的多租户记忆。请使用 Mem0、Chroma 或 LangChain Memory 替代。
+
+> 我们宁愿你选择正确的工具，而不是选择我们。如果 LimbicDB 不适合你的情况，这些替代方案确实是很好的选择。
+
 ## 与 CogniCore 的关系
 
 LimbicDB 负责 **memory**。
@@ -155,6 +180,8 @@ CogniCore 负责 **runtime orchestration、governance 和 recovery**。
 
 * **CogniCore** 决定 Agent 如何运行
 * **LimbicDB** 决定记忆如何存储、召回和维护
+
+**重要：** LimbicDB 和 CogniCore 是**独立的、版本独立**的项目。你可以在没有 CogniCore 的情况下使用 LimbicDB，反之亦然。
 
 ---
 
@@ -291,6 +318,38 @@ const devDb = openMemory(':memory:')
 // 强制使用 SQLite 后端（生产）
 const prodDb = openSQLite('./agent.limbic')
 ```
+
+### 语义搜索示例
+
+LimbicDB v0.4 增加语义搜索支持，使用自带嵌入函数：
+
+```typescript
+import { open } from 'limbicdb'
+
+// 使用你的嵌入函数打开
+const memory = open({
+  path: './agent.limbic',
+  embedder: {
+    async embed(text) {
+      // 使用 @xenova/transformers、OpenAI、Cohere 或任何提供商
+      // 返回 number[] 向量
+      return computeEmbedding(text)
+    },
+    dimensions: 384
+  }
+})
+
+// 语义召回查找含义，不仅仅是关键词
+const results = await memory.recall('用户界面偏好', {
+  mode: 'semantic', // 或 'hybrid' 或 'keyword'
+  limit: 5
+})
+
+console.log(`模式: ${results.meta.mode}`)
+console.log(`降级: ${results.meta.fallback}`) // 如果没有嵌入函数则为 true
+```
+
+查看完整示例：[`examples/semantic-recall.ts`](examples/semantic-recall.ts)
 
 ## 许可证
 

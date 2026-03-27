@@ -6,12 +6,15 @@
  */
 
 import { SQLiteStore } from './storage/sqlite-store'
+import { EmbeddingStore, cosineSimilarity } from './embedding-store'
 import type {
   LimbicDB,
   LimbicDBConfig,
   Memory,
   RememberOptions,
   RecallOptions,
+  RecallResult,
+  RecallMode,
   ForgetFilter,
   HistoryOptions,
   LimbicDBStats,
@@ -43,8 +46,9 @@ const DEFAULT_LIMITS = {
 export class LimbicDBSQLite implements LimbicDB {
   private config: Required<LimbicDBConfig>
   private store: SQLiteStore
-  // @ts-ignore - Will be used for semantic search
   private _embedder?: Embedder
+  private _embeddingStore?: EmbeddingStore
+  private _pendingEmbeddings = 0
   private _pruneIntervalId: NodeJS.Timeout | null = null
   private _statsCache: LimbicDBStats = {
     memoryCount: 0,
@@ -58,6 +62,15 @@ export class LimbicDBSQLite implements LimbicDB {
     this.config = config
     this.store = new SQLiteStore(config.path)
     this._embedder = config.embedder
+    
+    // Initialize embedding store if embedder is provided
+    if (this._embedder) {
+      // @ts-ignore - Access private db field
+      const db = (this.store as any).db
+      if (db) {
+        this._embeddingStore = new EmbeddingStore({ type: 'sqlite', db })
+      }
+    }
     
     // Start automatic pruning if enabled
     if (this.config.decay!.enabled) {
@@ -77,9 +90,45 @@ export class LimbicDBSQLite implements LimbicDB {
         snapshotCount: storeStats.snapshotCount,
         dbSizeBytes: storeStats.dbSizeBytes
       }
+      
+      // Add embedding statistics if available
+      if (this._embeddingStore) {
+        try {
+          this._statsCache.embeddingsCount = await this._embeddingStore.count()
+          if (this._embedder) {
+            this._statsCache.embeddingsDimensions = this._embedder.dimensions
+          }
+        } catch (err) {
+          // Silently fail - stats will not include embedding info
+        }
+      }
     } catch (error) {
       // Silently fail - stats will remain at default values
       console.warn('Failed to update stats cache:', error)
+    }
+  }
+  
+  private async ensureEmbeddingStoreInitialized(): Promise<void> {
+    if (this._embeddingStore) {
+      await this._embeddingStore.initialize()
+    }
+  }
+  
+  private async computeEmbeddingAsync(memoryId: string, content: string): Promise<void> {
+    if (!this._embedder || !this._embeddingStore) return
+    
+    try {
+      await this.ensureEmbeddingStoreInitialized()
+      const vector = await this._embedder.embed(content)
+      await this._embeddingStore.store(memoryId, vector, this._embedder.modelHint || 'user-provided')
+    } catch (err) {
+      // Log but don't throw. Memory is saved, embedding is best-effort.
+      if (typeof console !== 'undefined') {
+        console.warn(`[limbicdb] Embedding failed for memory ${memoryId}:`, 
+          err instanceof Error ? err.message : err)
+      }
+    } finally {
+      this._pendingEmbeddings--
     }
   }
   
@@ -155,11 +204,79 @@ export class LimbicDBSQLite implements LimbicDB {
     // Update stats cache in background
     this.updateStatsCache().catch(() => { /* ignore */ })
     
+    // Async embedding (fire-and-forget)
+    if (this._embedder && this._embeddingStore) {
+      this._pendingEmbeddings++
+      this.computeEmbeddingAsync(id, content).catch(() => {
+        // Error already logged in computeEmbeddingAsync
+      })
+    }
+    
     return memory
   }
   
-  async recall(query: string, options?: RecallOptions): Promise<Memory[]> {
-    const now = Date.now()
+  async recall(query: string, options?: RecallOptions): Promise<RecallResult> {
+    const startTime = Date.now()
+    const now = startTime
+    const limit = options?.limit || 10
+    const minStrength = options?.minStrength || 0.01
+    const mode = options?.mode || 'keyword'
+    
+    // Determine actual mode based on embedder availability
+    const actualMode: RecallMode = this.determineActualMode(mode)
+    const fallback = (mode === 'semantic' || mode === 'hybrid') && actualMode === 'keyword'
+    
+    let memories: Memory[] = []
+    let embedMs = 0
+    
+    if (actualMode === 'keyword') {
+      memories = await this.executeKeywordRecall(query, options, startTime)
+    } else {
+      // For now, semantic and hybrid modes fall back to keyword in SQLite backend
+      // TODO: Implement proper semantic/hybrid search for SQLite
+      console.warn('[limbicdb] SQLite backend: semantic/hybrid search not yet implemented, falling back to keyword')
+      memories = await this.executeKeywordRecall(query, options, startTime)
+    }
+    
+    const searchMs = Date.now() - startTime
+    
+    return {
+      memories,
+      meta: {
+        mode: actualMode,
+        fallback,
+        pendingEmbeddings: this._pendingEmbeddings,
+        timing: {
+          searchMs,
+          embedMs
+        }
+      }
+    }
+  }
+  
+  private determineActualMode(requestedMode: RecallMode): RecallMode {
+    switch (requestedMode) {
+      case 'keyword':
+        return 'keyword'
+      case 'semantic':
+      case 'hybrid':
+        // Check if embedder is available
+        if (!this._embedder || !this._embeddingStore) {
+          return 'keyword' // fallback
+        }
+        // TODO: Check if embeddings exist for any memories
+        return requestedMode
+      default:
+        return 'keyword'
+    }
+  }
+  
+  private async executeKeywordRecall(
+    query: string,
+    options: RecallOptions | undefined,
+    startTime: number
+  ): Promise<Memory[]> {
+    const now = startTime
     const limit = options?.limit || 10
     const minStrength = options?.minStrength || 0.01
     
@@ -219,6 +336,12 @@ export class LimbicDBSQLite implements LimbicDB {
     }))
   }
   
+  // Legacy method for backward compatibility
+  async recallLegacy(query: string, options?: RecallOptions): Promise<Memory[]> {
+    const result = await this.recall(query, options)
+    return result.memories
+  }
+  
   async forget(filter: ForgetFilter): Promise<number> {
     // Safety: require at least one filter
     if (!filter.ids && !filter.kind && !filter.tags && !filter.before && filter.maxStrength === undefined) {
@@ -239,6 +362,19 @@ export class LimbicDBSQLite implements LimbicDB {
     // Soft delete each memory
     for (const memory of memories) {
       await this.store.deleteMemory(memory.id)
+      
+      // Also delete embedding if exists
+      if (this._embeddingStore) {
+        try {
+          await this._embeddingStore.delete(memory.id)
+        } catch (err) {
+          // Log but continue
+          if (typeof console !== 'undefined') {
+            console.warn(`[limbicdb] Failed to delete embedding for ${memory.id}:`, 
+              err instanceof Error ? err.message : err)
+          }
+        }
+      }
       
       await this.store.logEvent({
         id: generateId(),

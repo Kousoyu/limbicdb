@@ -94,4 +94,4 @@ export { open as openMemory } from './core'
 export { openSQLite } from './sqlite'
 
 // Version
-export const VERSION = '0.3.0-alpha.2'
+export const VERSION = '0.4.0-alpha.1'

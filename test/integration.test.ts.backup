@@ -23,7 +23,7 @@ describe('LimbicDB SQLite Integration', () => {
     expect(memory2.id).toBeDefined()
     
     // Search for TypeScript
-    const results = (await db.recall('TypeScript')).memories
+    const results = await db.recall('TypeScript')
     expect(results.length).toBeGreaterThan(0)
     expect(results.some(r => r.content.includes('TypeScript'))).toBe(true)
   })
@@ -39,7 +39,7 @@ describe('LimbicDB SQLite Integration', () => {
     expect(forgotten).toBe(2)
     
     // Verify only permanent remains
-    const results = (await db.recall('')).memories
+    const results = await db.recall('')
     expect(results.length).toBe(1)
     expect(results[0].content).toBe('Permanent memory')
     expect(results[0].tags).toContain('permanent')
@@ -89,7 +89,7 @@ describe('LimbicDB SQLite Integration', () => {
     await db.restore(snapshotId)
     
     // Verify only snapshot data exists - use empty query to get all
-    const memories = (await db.recall('')).memories
+    const memories = await db.recall('')
     expect(memories.length).toBe(2) // Only the two snapshot memories
     expect(memories.some(m => m.content.includes('Memory added after snapshot'))).toBe(false)
     expect(memories.some(m => m.content.includes('Snapshot test memory 1'))).toBe(true)
@@ -109,7 +109,7 @@ describe('LimbicDB SQLite Integration', () => {
     await dbWithDecay.remember('快速衰减测试', { strength: 0.1 })
     
     // Memory should be weak initially
-    const results = (await dbWithDecay.recall('快速衰减测试')).memories
+    const results = await dbWithDecay.recall('快速衰减测试')
     // With recency boost, initial strength is ~0.33 (0.1 base + 0.2 recencyBoost)
     // This is actually correct - recency effect gives temporary boost
     expect(results[0].strength).toBeLessThan(0.4)

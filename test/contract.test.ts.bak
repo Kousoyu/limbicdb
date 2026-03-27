@@ -32,7 +32,7 @@ describeWithBackends('LimbicDB Contract Tests', (createDb) => {
       await db.remember('Unrelated content')
 
       // Act
-      const results = (await db.recall('test')).memories
+      const results = await db.recall('test')
 
       // Assert
       expect(results.length).toBe(2)
@@ -47,7 +47,7 @@ describeWithBackends('LimbicDB Contract Tests', (createDb) => {
       await db.remember('MixedCase Test')
 
       // Act
-      const results = (await db.recall('test')).memories
+      const results = await db.recall('test')
 
       // Assert
       expect(results.length).toBe(3)
@@ -60,7 +60,7 @@ describeWithBackends('LimbicDB Contract Tests', (createDb) => {
       await db.remember('No match')
 
       // Act
-      const results = (await db.recall('test')).memories
+      const results = await db.recall('test')
 
       // Assert - At least exact match should work
       expect(results.length).toBeGreaterThanOrEqual(1)
@@ -77,7 +77,7 @@ describeWithBackends('LimbicDB Contract Tests', (createDb) => {
       await db.remember('测试内容')
 
       // Act
-      const results = (await db.recall('测试')).memories
+      const results = await db.recall('测试')
 
       // Assert
       expect(results.length).toBeGreaterThanOrEqual(2)
@@ -92,7 +92,7 @@ describeWithBackends('LimbicDB Contract Tests', (createDb) => {
       await db.remember('Memory 3', { tags: ['other'] })
 
       // Act
-      const results = (await db.recall('')).memories
+      const results = await db.recall('')
 
       // Assert
       expect(results.length).toBe(3)
@@ -106,8 +106,8 @@ describeWithBackends('LimbicDB Contract Tests', (createDb) => {
       await db.remember('Another fact', { kind: 'fact' })
 
       // Act
-      const facts = (await db.recall('', { kind: 'fact' })).memories
-      const preferences = (await db.recall('', { kind: 'preference' })).memories
+      const facts = await db.recall('', { kind: 'fact' })
+      const preferences = await db.recall('', { kind: 'preference' })
 
       // Assert
       expect(facts.length).toBe(2)
@@ -124,7 +124,7 @@ describeWithBackends('LimbicDB Contract Tests', (createDb) => {
       await db.remember('Fact 2', { kind: 'fact' })
 
       // Act
-      const results = (await db.recall('', { kind: ['fact', 'episode'] })).memories
+      const results = await db.recall('', { kind: ['fact', 'episode'] })
 
       // Assert
       expect(results.length).toBe(3)
@@ -143,7 +143,7 @@ describeWithBackends('LimbicDB Contract Tests', (createDb) => {
       await db.remember('Memory with tag1 and other', { tags: ['tag1', 'other'] })
 
       // Act
-      const results = (await db.recall('', { tags: ['tag1', 'tag2'] })).memories
+      const results = await db.recall('', { tags: ['tag1', 'tag2'] })
 
       // Assert
       expect(results.length).toBe(1)
@@ -158,7 +158,7 @@ describeWithBackends('LimbicDB Contract Tests', (createDb) => {
       await db.remember('Memory 2', { tags: [] })
 
       // Act
-      const results = (await db.recall('', { tags: [] })).memories
+      const results = await db.recall('', { tags: [] })
 
       // Assert - empty tags array should return all memories (no tag filter)
       expect(results.length).toBe(2)
@@ -172,7 +172,7 @@ describeWithBackends('LimbicDB Contract Tests', (createDb) => {
       await db.remember('Fact with both tags', { kind: 'fact', tags: ['tag1', 'tag2'] })
 
       // Act
-      const results = (await db.recall('', { kind: 'fact', tags: ['tag1', 'tag2'] })).memories
+      const results = await db.recall('', { kind: 'fact', tags: ['tag1', 'tag2'] })
 
       // Assert
       expect(results.length).toBe(1)
@@ -190,9 +190,9 @@ describeWithBackends('LimbicDB Contract Tests', (createDb) => {
       await db.remember('Medium memory', { strength: 0.5 })
 
       // Act
-      const strongResults = (await db.recall('', { minStrength: 0.8 })).memories
-      const mediumResults = (await db.recall('', { minStrength: 0.4 })).memories
-      const allResults = (await db.recall('', { minStrength: 0.01 })).memories
+      const strongResults = await db.recall('', { minStrength: 0.8 })
+      const mediumResults = await db.recall('', { minStrength: 0.4 })
+      const allResults = await db.recall('', { minStrength: 0.01 })
 
       // Assert
       expect(strongResults.length).toBe(1)
@@ -215,7 +215,7 @@ describeWithBackends('LimbicDB Contract Tests', (createDb) => {
       await db.remember('Older memory')
 
       // Act - use relative time
-      const recentResults = (await db.recall('', { since: '1h ago' })).memories
+      const recentResults = await db.recall('', { since: '1h ago' })
       
       // Assert - at least recent memory should be included
       expect(recentResults.length).toBeGreaterThan(0)
@@ -230,9 +230,9 @@ describeWithBackends('LimbicDB Contract Tests', (createDb) => {
       }
 
       // Act
-      const limit3 = (await db.recall('', { limit: 3 })).memories
-      const limit5 = (await db.recall('', { limit: 5 })).memories
-      const defaultLimit = (await db.recall('')).memories
+      const limit3 = await db.recall('', { limit: 3 })
+      const limit5 = await db.recall('', { limit: 5 })
+      const defaultLimit = await db.recall('')
 
       // Assert
       expect(limit3.length).toBe(3)
@@ -247,7 +247,7 @@ describeWithBackends('LimbicDB Contract Tests', (createDb) => {
       await db.remember('Medium memory', { strength: 0.5 })
 
       // Act
-      const results = (await db.recall('')).memories
+      const results = await db.recall('')
 
       // Assert
       expect(results.length).toBe(3)
@@ -267,7 +267,8 @@ describeWithBackends('LimbicDB Contract Tests', (createDb) => {
 
       // Act
       const forgotten = await db.forget({ tags: ['temp'] })
-      const remaining = (await db.recall('')).memories
+      const remainingResult = await db.recall('')
+      const remaining = remainingResult.memories
 
       // Assert
       expect(forgotten).toBe(2)
@@ -283,7 +284,8 @@ describeWithBackends('LimbicDB Contract Tests', (createDb) => {
 
       // Act
       const forgotten = await db.forget({ kind: 'goal' })
-      const remaining = (await db.recall('')).memories
+      const remainingResult = await db.recall('')
+      const remaining = remainingResult.memories
 
       // Assert
       expect(forgotten).toBe(2)
