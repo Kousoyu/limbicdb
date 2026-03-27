@@ -90,7 +90,7 @@ LimbicDB is designed for agents that need durable, inspectable memory without re
 
 ## Known Limitations (Alpha)
 
-LimbicDB v0.4.0-alpha.1 has these current limitations:
+LimbicDB v0.4.0-alpha.3 has these current limitations:
 
 * **Chinese / CJK search support is limited**  
   FTS5 default configuration has limitations with CJK characters; search may not match partial words or characters within multi-character terms.
@@ -120,6 +120,19 @@ If you try it, the most helpful feedback is:
 - places where the README feels stronger than the real product
 
 Please open an issue using the built-in templates.
+
+## Documentation
+
+For troubleshooting common issues, see:
+- [TROUBLESHOOTING.md](./TROUBLESHOOTING.md) - Solutions to common "trust-breaking" issues
+- [BETA-ENTRANCE-CRITERIA.md](./BETA-ENTRANCE-CRITERIA.md) - Criteria for moving from alpha to beta
+
+Key topics covered:
+- Why semantic/hybrid search falls back to keyword
+- Differences between SQLite and memory backends
+- When embeddings become available for search
+- Current CJK search boundaries and limitations
+- Performance characteristics and expectations
 
 ## Current Implementation Status
 
