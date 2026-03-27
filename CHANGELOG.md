@@ -5,6 +5,37 @@ All notable changes to LimbicDB will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.0-alpha.2] - 2026-03-27
+
+### 🔧 Chinese Search Enhancement Patch
+This alpha.2 release focuses on improving Chinese/CJK character search support with a hybrid FTS5 + LIKE fallback strategy.
+
+### Added
+- **Hybrid Chinese search**: FTS5 for English/keywords, LIKE fallback for CJK characters
+- **CJK detection**: Automatic detection of Chinese/Japanese/Korean characters in queries
+- **Backward compatible**: No API changes, existing queries continue to work
+- **Performance optimized**: LIKE fallback only activates when needed (CJK chars + insufficient results)
+
+### Changed
+- **Search algorithm enhancement**: `SQLiteStore.searchMemories()` now implements hybrid search
+- **Improved partial matching**: Chinese characters can now match partially within content
+- **Enhanced test coverage**: All existing tests continue to pass
+
+### Fixed
+- **Chinese search limitations**: Addressed FTS5 tokenization constraints for CJK characters
+- **Partial word matching**: LIKE fallback enables substring matching for Chinese text
+
+### Technical Details
+The hybrid search works as follows:
+1. **FTS5 first**: Attempt standard full-text search (optimal for English/keywords)
+2. **CJK detection**: Check if query contains Chinese/Japanese/Korean characters
+3. **LIKE fallback**: If FTS5 results are insufficient AND query contains CJK, fall back to SQL LIKE operator
+4. **Result merging**: Combine and deduplicate results from both strategies
+
+This approach maintains FTS5 performance for most queries while providing better support for Chinese users.
+
+---
+
 ## [0.3.0-alpha.1] - 2026-03-27
 
 ### ⚠️ Alpha Release Notice

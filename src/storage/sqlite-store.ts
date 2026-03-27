@@ -148,6 +148,14 @@ export class SQLiteStore implements IStorage {
       LIMIT ?
     `)
     
+    this.prepare('searchMemoriesLike', `
+      SELECT m.*, 0.0 as score
+      FROM memories m
+      WHERE m.content LIKE ? AND m.is_deleted = 0
+      ORDER BY m.strength DESC, m.accessed_at DESC
+      LIMIT ?
+    `)
+    
     // State operations
     this.prepare('getState', `
       SELECT value FROM state WHERE key = ?
@@ -317,14 +325,19 @@ export class SQLiteStore implements IStorage {
       return filtered.slice(0, query.limit)
     }
     
-    // Simple keyword search for now (will be enhanced with hybrid search)
-    const stmt = this.getStatement('searchMemoriesKeyword')
+    // Hybrid search: try FTS5 first, fall back to LIKE for CJK queries if needed
     const safeQuery = this.sanitizeFTSQuery(query.query)
-    const rows = stmt.all(safeQuery, query.limit * 2) as any[]
+    const containsCJK = this.containsCJK(query.query)
     
-    // Convert rows to Memory objects
+    // Step 1: Try FTS5 search
+    const ftsStmt = this.getStatement('searchMemoriesKeyword')
+    const ftsRows = ftsStmt.all(safeQuery, query.limit * 2) as any[]
+    
+    // Convert FTS rows to Memory objects and apply filters
     const memories: Memory[] = []
-    for (const row of rows) {
+    const seenIds = new Set<string>()
+    
+    for (const row of ftsRows) {
       // Apply additional filters
       if (query.minStrength !== undefined && row.strength < query.minStrength) continue
       if (query.since !== undefined && row.created_at < query.since) continue
@@ -354,8 +367,53 @@ export class SQLiteStore implements IStorage {
         accessedAt: row.accessed_at,
         accessCount: row.access_count
       })
+      seenIds.add(row.id)
       
       if (memories.length >= query.limit) break
+    }
+    
+    // Step 2: If we don't have enough results AND query contains CJK characters,
+    // fall back to LIKE search for better partial matching
+    if (memories.length < query.limit && containsCJK) {
+      const likeStmt = this.getStatement('searchMemoriesLike')
+      const likePattern = `%${query.query.replace(/%/g, '\\%').replace(/_/g, '\\_')}%`
+      const likeRows = likeStmt.all(likePattern, query.limit * 2) as any[]
+      
+      for (const row of likeRows) {
+        // Skip duplicates
+        if (seenIds.has(row.id)) continue
+        
+        // Apply filters (same as above)
+        if (query.minStrength !== undefined && row.strength < query.minStrength) continue
+        if (query.since !== undefined && row.created_at < query.since) continue
+        
+        if (query.kind) {
+          const kinds = Array.isArray(query.kind) ? query.kind : [query.kind]
+          if (!kinds.includes(row.kind as MemoryKind)) continue
+        }
+        
+        if (query.tags && query.tags.length > 0) {
+          const rowTags = JSON.parse(row.tags) as string[]
+          const hasAllTags = query.tags.every(tag => rowTags.includes(tag))
+          if (!hasAllTags) continue
+        }
+        
+        memories.push({
+          id: row.id,
+          content: row.content,
+          kind: row.kind as MemoryKind,
+          tags: JSON.parse(row.tags),
+          meta: JSON.parse(row.meta),
+          strength: row.strength,
+          baseStrength: row.base_strength,
+          createdAt: row.created_at,
+          accessedAt: row.accessed_at,
+          accessCount: row.access_count
+        })
+        seenIds.add(row.id)
+        
+        if (memories.length >= query.limit) break
+      }
     }
     
     return memories
@@ -635,6 +693,17 @@ export class SQLiteStore implements IStorage {
   }
   
   // --- Helper Methods ---
+  private containsCJK(text: string): boolean {
+    // CJK Unicode ranges (Chinese, Japanese, Korean)
+    const cjkRegex = /[\u4e00-\u9fff\u3400-\u4dbf\uf900-\ufaff\u3040-\u309f\u30a0-\u30ff\uac00-\ud7af]/
+    return cjkRegex.test(text)
+  }
+
+  private escapeLikeQuery(query: string): string {
+    // Escape SQLite LIKE wildcards: % → \%, _ → \_, \ → \\
+    return query.replace(/[%_\\]/g, '\\$&')
+  }
+
   private sanitizeFTSQuery(query: string): string {
     // Basic sanitization for FTS5 query
     // Remove characters that could break FTS5 syntax
