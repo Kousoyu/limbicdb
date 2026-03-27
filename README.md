@@ -324,7 +324,7 @@ const prodDb = openSQLite('./agent.limbic')
 
 ### Semantic Search Example
 
-LimbicDB v0.4 adds semantic search support with bring-your-own embedder:
+LimbicDB v0.4 alpha adds semantic search support with bring-your-own embedder:
 
 ```typescript
 import { open } from 'limbicdb'

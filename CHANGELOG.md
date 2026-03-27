@@ -5,10 +5,12 @@ All notable changes to LimbicDB will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [0.4.0-alpha.1] - 2026-03-27
+## [0.4.0-alpha.2] - 2026-03-27
 
 ### 🧠 Semantic Search Prototype (Bring-Your-Own Embedder)
 This alpha release introduces semantic search capabilities to LimbicDB, proving the architecture is feasible and extensible. The key insight: **semantic search is the watershed moment from "keyword memory" to "cognitive memory"**.
+
+> **Note**: This release is functionally identical to what would have been `0.4.0-alpha.1` but was renumbered due to a publishing conflict.
 
 ### Added
 - **Semantic search interface**: New `mode` parameter for `recall()`: `keyword` | `semantic` | `hybrid`
