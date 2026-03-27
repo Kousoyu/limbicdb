@@ -38,8 +38,8 @@ describe('LimbicDB SQLite Integration', () => {
     const forgotten = await db.forget({ tags: ['temp'] })
     expect(forgotten).toBe(2)
     
-    // Verify only permanent remains - use empty query with tags filter
-    const results = await db.recall('', { tags: ['permanent'] })
+    // Verify only permanent remains
+    const results = await db.recall('')
     expect(results.length).toBe(1)
     expect(results[0].content).toBe('Permanent memory')
     expect(results[0].tags).toContain('permanent')
