@@ -423,3 +423,5 @@ MIT
 ---
 
 *Built for embedded agents that need durable, inspectable memory without server dependencies.*
+
+<!-- Public sync check: 2026-03-28 -->
