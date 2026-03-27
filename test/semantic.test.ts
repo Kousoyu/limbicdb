@@ -282,18 +282,18 @@ describeWithBackends('LimbicDB Semantic Search Tests', (createDb) => {
         // Give time for async embeddings (if any)
         await new Promise(resolve => setTimeout(resolve, 100))
         
-        // Test semantic mode - SQLite backend should fall back to keyword
+        // Test semantic mode - SQLite backend should execute semantic when embedder is configured
         const result = await memory.recall('technology', { mode: 'semantic' })
         
-        // Critical assertions from user's analysis:
-        // 1. executedMode should be 'keyword' (SQLite doesn't implement semantic yet)
-        expect(result.meta.executedMode).toBe('keyword')
+        // Critical contract assertions:
+        // 1. executedMode should be semantic
+        expect(result.meta.executedMode).toBe('semantic')
         
         // 2. requestedMode should be 'semantic' (what user asked for)
         expect(result.meta.requestedMode).toBe('semantic')
         
-        // 3. fallback should be true (semantic requested but keyword executed)
-        expect(result.meta.fallback).toBe(true)
+        // 3. fallback should be false (semantic executed successfully)
+        expect(result.meta.fallback).toBe(false)
         
         // 4. mode should equal executedMode (backward compatibility)
         expect(result.meta.mode).toBe(result.meta.executedMode)

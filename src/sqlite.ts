@@ -217,26 +217,30 @@ export class LimbicDBSQLite implements LimbicDB {
   
   async recall(query: string, options?: RecallOptions): Promise<RecallResult> {
     const startTime = Date.now()
-    const now = startTime
-    const limit = options?.limit || 10
-    const minStrength = options?.minStrength || 0.01
     const requestedMode = options?.mode || 'keyword'
     
-    // Determine what mode would be executed
-    // In SQLite backend, semantic/hybrid are not yet implemented, so always execute keyword
-    const executedMode: RecallMode = 'keyword'
+    // Determine what mode can be executed
+    const executedMode: RecallMode = this.determineActualMode(requestedMode)
     const fallback = (requestedMode === 'semantic' || requestedMode === 'hybrid') && executedMode === 'keyword'
     
-    // Log warning if user requested semantic/hybrid but we're falling back
     if (fallback) {
-      console.warn('[limbicdb] SQLite backend: semantic/hybrid search not yet implemented, falling back to keyword')
+      console.warn('[limbicdb] SQLite backend: semantic/hybrid requires embedder and embeddings, falling back to keyword')
     }
     
     let memories: Memory[] = []
     let embedMs = 0
     
-    // Always execute keyword recall for now
-    memories = await this.executeKeywordRecall(query, options, startTime)
+    if (executedMode === 'keyword') {
+      memories = await this.executeKeywordRecall(query, options, startTime)
+    } else if (executedMode === 'semantic') {
+      const result = await this.executeSemanticRecall(query, options, startTime)
+      memories = result.memories
+      embedMs = result.embedMs
+    } else if (executedMode === 'hybrid') {
+      const result = await this.executeHybridRecall(query, options, startTime)
+      memories = result.memories
+      embedMs = result.embedMs
+    }
     
     const searchMs = Date.now() - startTime
     
@@ -266,7 +270,6 @@ export class LimbicDBSQLite implements LimbicDB {
         if (!this._embedder || !this._embeddingStore) {
           return 'keyword' // fallback
         }
-        // TODO: Check if embeddings exist for any memories
         return requestedMode
       default:
         return 'keyword'
@@ -336,6 +339,173 @@ export class LimbicDBSQLite implements LimbicDB {
       accessedAt: now,
       accessCount: mem.accessCount + 1
     }))
+  }
+
+  private async executeSemanticRecall(
+    query: string,
+    options: RecallOptions | undefined,
+    startTime: number
+  ): Promise<{ memories: Memory[]; embedMs: number }> {
+    const embedStartTime = Date.now()
+    const queryVector = await this._embedder!.embed(query)
+    const embedMs = Date.now() - embedStartTime
+    const now = startTime
+    const limit = options?.limit || 10
+    const minStrength = options?.minStrength || 0.01
+
+    await this.ensureEmbeddingStoreInitialized()
+
+    const candidateMemories = await this.store.searchMemories({
+      query: '',
+      limit: Math.max(limit * 10, 100),
+      minStrength,
+      kind: options?.kind,
+      tags: options?.tags,
+      since: options?.since ? parseTime(options.since) : undefined
+    })
+
+    const candidateMap = new Map(candidateMemories.map(memory => [memory.id, memory]))
+    const embeddings = await this._embeddingStore!.getAll()
+    const similarities: Array<{ memoryId: string; similarity: number }> = []
+
+    for (const row of embeddings) {
+      if (!candidateMap.has(row.memoryId)) continue
+      if (row.vector.length !== queryVector.length) continue
+
+      const similarity = cosineSimilarity(row.vector, queryVector)
+      if (similarity > 0) {
+        similarities.push({ memoryId: row.memoryId, similarity })
+      }
+    }
+
+    similarities.sort((a, b) => b.similarity - a.similarity)
+
+    const results: Memory[] = []
+    for (const item of similarities.slice(0, limit)) {
+      const memory = candidateMap.get(item.memoryId)
+      if (!memory) continue
+
+      const newStrength = computeStrength(
+        memory.baseStrength || memory.strength,
+        memory.createdAt,
+        now,
+        memory.accessCount + 1,
+        this.config.decay as DecayConfig,
+        now
+      )
+
+      await this.store.updateMemoryAccess(memory.id, now, newStrength)
+      results.push({
+        ...memory,
+        strength: newStrength,
+        accessedAt: now,
+        accessCount: memory.accessCount + 1
+      })
+    }
+
+    await this.store.logEvent({
+      id: generateId(),
+      type: 'memory',
+      action: 'access',
+      content: `Recalled: "${query.substring(0, 50)}" (semantic, found ${results.length} memories)`,
+      timestamp: now
+    })
+
+    return { memories: results, embedMs }
+  }
+
+  private async executeHybridRecall(
+    query: string,
+    options: RecallOptions | undefined,
+    startTime: number
+  ): Promise<{ memories: Memory[]; embedMs: number }> {
+    const embedStartTime = Date.now()
+    const queryVector = await this._embedder!.embed(query)
+    const embedMs = Date.now() - embedStartTime
+    const now = startTime
+    const limit = options?.limit || 10
+    const minStrength = options?.minStrength || 0.01
+
+    await this.ensureEmbeddingStoreInitialized()
+
+    const candidateMemories = await this.store.searchMemories({
+      query: '',
+      limit: Math.max(limit * 10, 100),
+      minStrength,
+      kind: options?.kind,
+      tags: options?.tags,
+      since: options?.since ? parseTime(options.since) : undefined
+    })
+
+    const candidateMap = new Map(candidateMemories.map(memory => [memory.id, memory]))
+    const candidateIds = Array.from(candidateMap.keys())
+    const queryLower = query.toLowerCase()
+    const keywordScores = new Map<string, number>()
+
+    for (const memory of candidateMemories) {
+      let score = 0
+      if (memory.content.toLowerCase().includes(queryLower)) {
+        score = 1.0
+      } else {
+        const words = queryLower.split(/\s+/).filter(w => w.length > 2)
+        const contentLower = memory.content.toLowerCase()
+        const matchedWords = words.filter(w => contentLower.includes(w)).length
+        score = words.length > 0 ? matchedWords / words.length : 0
+      }
+      keywordScores.set(memory.id, score)
+    }
+
+    const semanticScores = new Map<string, number>()
+    const embeddings = await this._embeddingStore!.getAll()
+    for (const row of embeddings) {
+      if (!candidateMap.has(row.memoryId)) continue
+      if (row.vector.length !== queryVector.length) continue
+
+      const similarity = cosineSimilarity(row.vector, queryVector)
+      semanticScores.set(row.memoryId, (similarity + 1) / 2)
+    }
+
+    const combinedScores = new Map<string, number>()
+    for (const id of candidateIds) {
+      const semantic = semanticScores.get(id) || 0
+      const keyword = keywordScores.get(id) || 0
+      combinedScores.set(id, (semantic * 0.7) + (keyword * 0.3))
+    }
+
+    const sortedIds = candidateIds.sort((a, b) => (combinedScores.get(b) || 0) - (combinedScores.get(a) || 0))
+    const results: Memory[] = []
+
+    for (const memoryId of sortedIds.slice(0, limit)) {
+      const memory = candidateMap.get(memoryId)
+      if (!memory) continue
+
+      const newStrength = computeStrength(
+        memory.baseStrength || memory.strength,
+        memory.createdAt,
+        now,
+        memory.accessCount + 1,
+        this.config.decay as DecayConfig,
+        now
+      )
+
+      await this.store.updateMemoryAccess(memory.id, now, newStrength)
+      results.push({
+        ...memory,
+        strength: newStrength,
+        accessedAt: now,
+        accessCount: memory.accessCount + 1
+      })
+    }
+
+    await this.store.logEvent({
+      id: generateId(),
+      type: 'memory',
+      action: 'access',
+      content: `Recalled: "${query.substring(0, 50)}" (hybrid, found ${results.length} memories)`,
+      timestamp: now
+    })
+
+    return { memories: results, embedMs }
   }
   
   // Legacy method for backward compatibility

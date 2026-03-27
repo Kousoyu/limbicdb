@@ -72,10 +72,54 @@ export class EmbeddingStore {
     }
   }
 
+  private isPromiseLike(value: any): value is Promise<any> {
+    return value && typeof value.then === 'function';
+  }
+
+  private async dbExec(sql: string): Promise<void> {
+    if (!this.db) throw new Error('SQLite database not initialized');
+    const result = this.db.exec(sql);
+    if (this.isPromiseLike(result)) {
+      await result;
+    }
+  }
+
+  private async dbRun(sql: string, params: any[]): Promise<void> {
+    if (!this.db) throw new Error('SQLite database not initialized');
+    if (typeof this.db.run === 'function') {
+      const result = this.db.run(sql, params);
+      if (this.isPromiseLike(result)) {
+        await result;
+      }
+      return;
+    }
+    const stmt = this.db.prepare(sql);
+    stmt.run(...params);
+  }
+
+  private async dbGet(sql: string, params: any[]): Promise<any> {
+    if (!this.db) throw new Error('SQLite database not initialized');
+    if (typeof this.db.get === 'function') {
+      const result = this.db.get(sql, params);
+      return this.isPromiseLike(result) ? await result : result;
+    }
+    const stmt = this.db.prepare(sql);
+    return stmt.get(...params);
+  }
+
+  private async dbAll(sql: string, params: any[] = []): Promise<any[]> {
+    if (!this.db) throw new Error('SQLite database not initialized');
+    if (typeof this.db.all === 'function') {
+      const result = this.db.all(sql, params);
+      return this.isPromiseLike(result) ? await result : result;
+    }
+    const stmt = this.db.prepare(sql);
+    return stmt.all(...params);
+  }
+
   async initialize(): Promise<void> {
     if (this.mode === 'sqlite') {
-      if (!this.db) throw new Error('SQLite database not initialized');
-      await this.db.exec(`
+      await this.dbExec(`
         CREATE TABLE IF NOT EXISTS memory_embeddings (
           memory_id TEXT PRIMARY KEY,
           vector BLOB NOT NULL,
@@ -104,7 +148,7 @@ export class EmbeddingStore {
     }
 
     const blob = serializeVector(vector);
-    await this.db.run(
+    await this.dbRun(
       `INSERT OR REPLACE INTO memory_embeddings 
        (memory_id, vector, dimensions, model_hint) 
        VALUES (?, ?, ?, ?)`,
@@ -118,8 +162,7 @@ export class EmbeddingStore {
       return this.memoryStore.get(memoryId) ?? null;
     }
 
-    if (!this.db) throw new Error('SQLite database not initialized');
-    const row = await this.db.get(
+    const row = await this.dbGet(
       'SELECT * FROM memory_embeddings WHERE memory_id = ?',
       [memoryId]
     );
@@ -148,13 +191,12 @@ export class EmbeddingStore {
       return results;
     }
 
-    // For SQLite, join with memories table to exclude forgotten ones
-    if (!this.db) throw new Error('SQLite database not initialized');
-    const rows = await this.db.all(`
+    // For SQLite, join with memories table to exclude deleted memories.
+    const rows = await this.dbAll(`
       SELECT e.memory_id, e.vector, e.dimensions, e.model_hint
       FROM memory_embeddings e
       JOIN memories m ON e.memory_id = m.id
-      WHERE m.forgotten = 0
+      WHERE m.is_deleted = 0
     `);
 
     return rows.map((row: any) => ({
@@ -172,8 +214,7 @@ export class EmbeddingStore {
       return;
     }
 
-    if (!this.db) throw new Error('SQLite database not initialized');
-    await this.db.run(
+    await this.dbRun(
       'DELETE FROM memory_embeddings WHERE memory_id = ?',
       [memoryId]
     );
@@ -185,10 +226,9 @@ export class EmbeddingStore {
       return this.memoryStore.size;
     }
 
-    if (!this.db) throw new Error('SQLite database not initialized');
-    const row = await this.db.get(
+    const row = await this.dbGet(
       'SELECT COUNT(*) as cnt FROM memory_embeddings'
-    );
+    , []);
     return row.cnt;
   }
 
@@ -199,8 +239,7 @@ export class EmbeddingStore {
       return;
     }
 
-    if (!this.db) throw new Error('SQLite database not initialized');
-    await this.db.run('DELETE FROM memory_embeddings');
+    await this.dbRun('DELETE FROM memory_embeddings', []);
   }
 
   async getAll(): Promise<EmbeddingRow[]> {
@@ -209,10 +248,7 @@ export class EmbeddingStore {
       return Array.from(this.memoryStore.values());
     }
 
-    if (!this.db) throw new Error('SQLite database not initialized');
-    const rows = await this.db.all(
-      'SELECT * FROM memory_embeddings'
-    );
+    const rows = await this.dbAll('SELECT * FROM memory_embeddings');
 
     return rows.map((row: any) => ({
       memoryId: row.memory_id,
