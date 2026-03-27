@@ -45,6 +45,14 @@ export class LimbicDBSQLite implements LimbicDB {
   private store: SQLiteStore
   // @ts-ignore - Will be used for semantic search
   private _embedder?: Embedder
+  private _pruneIntervalId: NodeJS.Timeout | null = null
+  private _statsCache: LimbicDBStats = {
+    memoryCount: 0,
+    stateKeyCount: 0,
+    snapshotCount: 0,
+    dbSizeBytes: 0
+  }
+  private _statsUpdatePromise: Promise<void> | null = null
   
   constructor(config: Required<LimbicDBConfig>) {
     this.config = config
@@ -55,12 +63,30 @@ export class LimbicDBSQLite implements LimbicDB {
     if (this.config.decay!.enabled) {
       this.startAutoPrune()
     }
+    
+    // Initial stats update
+    this.updateStatsCache()
+  }
+  
+  private async updateStatsCache(): Promise<void> {
+    try {
+      const storeStats = await this.store.getStats()
+      this._statsCache = {
+        memoryCount: storeStats.memoryCount,
+        stateKeyCount: storeStats.stateKeyCount,
+        snapshotCount: storeStats.snapshotCount,
+        dbSizeBytes: storeStats.dbSizeBytes
+      }
+    } catch (error) {
+      // Silently fail - stats will remain at default values
+      console.warn('Failed to update stats cache:', error)
+    }
   }
   
   private startAutoPrune(): void {
     // @ts-ignore - decay is guaranteed to be DecayConfig
     const intervalMs = this.config.decay.pruneIntervalMinutes * 60 * 1000
-    setInterval(() => this.autoPrune(), intervalMs)
+    this._pruneIntervalId = setInterval(() => this.autoPrune(), intervalMs)
   }
   
   private async autoPrune(): Promise<void> {
@@ -125,6 +151,9 @@ export class LimbicDBSQLite implements LimbicDB {
       content: `Remembered [${kind}]: ${content.substring(0, 80)}`,
       timestamp: now
     })
+    
+    // Update stats cache in background
+    this.updateStatsCache().catch(() => { /* ignore */ })
     
     return memory
   }
@@ -221,6 +250,11 @@ export class LimbicDBSQLite implements LimbicDB {
       })
     }
     
+    // Update stats cache if any memories were deleted
+    if (memories.length > 0) {
+      this.updateStatsCache().catch(() => { /* ignore */ })
+    }
+    
     return memories.length
   }
   
@@ -232,9 +266,9 @@ export class LimbicDBSQLite implements LimbicDB {
   async set<T = any>(key: string, value: T): Promise<void> {
     const now = Date.now()
     const serialized = JSON.stringify(value)
+    const existed = await this.store.getState(key) !== null
     await this.store.setState(key, serialized, now)
     
-    const existed = await this.store.getState(key) !== null
     await this.store.logEvent({
       id: generateId(),
       type: 'state',
@@ -243,6 +277,9 @@ export class LimbicDBSQLite implements LimbicDB {
       content: `Set ${key}: ${typeof value}`,
       timestamp: now
     })
+    
+    // Update stats cache
+    this.updateStatsCache().catch(() => { /* ignore */ })
   }
   
   async delete(key: string): Promise<boolean> {
@@ -257,6 +294,9 @@ export class LimbicDBSQLite implements LimbicDB {
         content: `Deleted ${key}`,
         timestamp: Date.now()
       })
+      
+      // Update stats cache
+      this.updateStatsCache().catch(() => { /* ignore */ })
     }
     return existed
   }
@@ -330,18 +370,15 @@ export class LimbicDBSQLite implements LimbicDB {
   }
   
   async close(): Promise<void> {
+    if (this._pruneIntervalId) {
+      clearInterval(this._pruneIntervalId)
+      this._pruneIntervalId = null
+    }
     await this.store.close()
   }
   
   get stats(): LimbicDBStats {
-    // This is async in SQLiteStore, but we need sync getter
-    // For now, return placeholder stats - will need to refactor
-    return {
-      memoryCount: 0,
-      stateKeyCount: 0,
-      snapshotCount: 0,
-      dbSizeBytes: 0
-    }
+    return { ...this._statsCache }
   }
   
   // Helper method to get actual stats (async)

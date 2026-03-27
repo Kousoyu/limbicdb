@@ -289,6 +289,23 @@ export class SQLiteStore implements IStorage {
   }
   
   async searchMemories(query: SearchQuery): Promise<Memory[]> {
+    // Handle empty query - use filter-based search instead of FTS
+    if (!query.query.trim()) {
+      return this.getMemoriesByFilter({
+        kind: query.kind,
+        tags: query.tags,
+        before: query.since ? undefined : Date.now(), // Get all if no since filter
+        maxStrength: query.minStrength !== undefined ? undefined : 1.0 // No max strength filter
+      }).then(memories => {
+        // Apply minStrength and since filters
+        return memories.filter(memory => {
+          if (query.minStrength !== undefined && memory.strength < query.minStrength) return false
+          if (query.since !== undefined && memory.createdAt < query.since) return false
+          return true
+        }).slice(0, query.limit)
+      })
+    }
+    
     // Simple keyword search for now (will be enhanced with hybrid search)
     const stmt = this.getStatement('searchMemoriesKeyword')
     const safeQuery = this.sanitizeFTSQuery(query.query)
@@ -300,6 +317,19 @@ export class SQLiteStore implements IStorage {
       // Apply additional filters
       if (query.minStrength !== undefined && row.strength < query.minStrength) continue
       if (query.since !== undefined && row.created_at < query.since) continue
+      
+      // Apply kind filter if specified
+      if (query.kind) {
+        const kinds = Array.isArray(query.kind) ? query.kind : [query.kind]
+        if (!kinds.includes(row.kind as MemoryKind)) continue
+      }
+      
+      // Apply tags filter if specified
+      if (query.tags && query.tags.length > 0) {
+        const rowTags = JSON.parse(row.tags) as string[]
+        const hasAllTags = query.tags.every(tag => rowTags.includes(tag))
+        if (!hasAllTags) continue
+      }
       
       memories.push({
         id: row.id,
@@ -509,9 +539,9 @@ export class SQLiteStore implements IStorage {
     const stmt = this.getStatement('getStats')
     const row = stmt.get() as any
     return {
-      memoryCount: row.memory_count,
-      stateKeyCount: row.state_key_count,
-      snapshotCount: row.snapshot_count,
+      memoryCount: row.memory_count || 0,
+      stateKeyCount: row.state_key_count || 0,
+      snapshotCount: row.snapshot_count || 0,
       dbSizeBytes: row.db_size_bytes || 0
     }
   }
@@ -531,7 +561,7 @@ export class SQLiteStore implements IStorage {
       this.db.exec('DELETE FROM timeline')
       
       // Restore memories
-      for (const [id, memory] of snapshotData.memories) {
+      for (const [_id, memory] of snapshotData.memories) {
         const mem = memory as Memory
         const tagsJson = JSON.stringify(mem.tags)
         const metaJson = JSON.stringify(mem.meta)

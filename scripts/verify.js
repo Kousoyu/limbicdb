@@ -5,7 +5,7 @@
  * 运行: node scripts/verify.js
  */
 
-import { open } from '../src/index.js'
+import { open } from '../dist/index.js'
 
 async function runTest(name, testFn) {
   try {
