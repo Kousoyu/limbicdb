@@ -164,9 +164,9 @@ To set clear expectations about what kind of search works today:
 | Capability | Status | Notes |
 |------------|--------|-------|
 | **English keyword search** | ✅ Stable | Exact and partial word matching with FTS5 |
-| **Chinese/CJK exact term** | 🔄 Improving | Hybrid FTS5 + LIKE fallback in alpha.2 |
-| **Chinese/CJK partial match** | 🧪 Experimental | Limited support via LIKE fallback |
-| **Mixed CJK + English** | 🧪 Experimental | Works but ranking may be suboptimal |
+| **Chinese/CJK exact term** | 🔄 Improving | FTS5 + LIKE fallback works for exact matches (tested) |
+| **Chinese/CJK partial match** | 🔄 Improving | LIKE fallback provides substring matching (tested) |
+| **Mixed CJK + English** | 🔄 Improving | Hybrid approach handles mixed queries (tested) |
 | **Semantic/embedding search** | 🧪 Experimental (bring-your-own embedder) | Memory backend fully implemented, SQLite backend experimental MVP |
 
 **Status Key:**

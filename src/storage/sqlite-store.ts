@@ -753,6 +753,9 @@ export class SQLiteStore implements IStorage {
   // --- Helper Methods ---
   private containsCJK(text: string): boolean {
     // CJK Unicode ranges (Chinese, Japanese, Korean)
+    // Chinese: \u4e00-\u9fff (CJK Unified Ideographs), \u3400-\u4dbf (Extension A)
+    // Japanese: \u3040-\u309f (Hiragana), \u30a0-\u30ff (Katakana)
+    // Korean: \uac00-\ud7af (Hangul Syllables)
     const cjkRegex = /[\u4e00-\u9fff\u3400-\u4dbf\uf900-\ufaff\u3040-\u309f\u30a0-\u30ff\uac00-\ud7af]/
     return cjkRegex.test(text)
   }
@@ -766,7 +769,9 @@ export class SQLiteStore implements IStorage {
   private sanitizeFTSQuery(query: string): string {
     // Basic sanitization for FTS5 query
     // Remove characters that could break FTS5 syntax
-    return query.replace(/[^\w\s\u4e00-\u9fa5]/g, ' ').trim()
+    // Keep alphanumeric, whitespace, and all CJK characters
+    const cjkRanges = '\u4e00-\u9fff\u3400-\u4dbf\uf900-\ufaff\u3040-\u309f\u30a0-\u30ff\uac00-\ud7af'
+    return query.replace(new RegExp(`[^\\w\\s${cjkRanges}]`, 'g'), ' ').trim()
   }
   
   // --- Transaction Support ---
