@@ -47,18 +47,13 @@ const failingEmbedder: Embedder = {
 
 describeWithBackends('LimbicDB Semantic Search Tests', (createDb) => {
   let db: LimbicDB
-  let dbWithEmbedder: LimbicDB
 
   beforeEach(async () => {
     db = await createDb()
-    dbWithEmbedder = await createDb()
-    // @ts-ignore - configure embedder directly for testing
-    dbWithEmbedder.configureEmbedder?.(mockEmbedder)
   })
 
   afterEach(async () => {
     await db.close()
-    await dbWithEmbedder.close()
   })
 
   describe('graceful degradation', () => {
@@ -93,10 +88,8 @@ describeWithBackends('LimbicDB Semantic Search Tests', (createDb) => {
 
   describe('embedding failure handling', () => {
     it('should remember successfully even if embedding fails', async () => {
-      // Arrange
-      const dbWithFailingEmbedder = await createDb()
-      // @ts-ignore - configure failing embedder
-      dbWithFailingEmbedder.configureEmbedder?.(failingEmbedder)
+      // Arrange - create db with failing embedder via public API
+      const dbWithFailingEmbedder = open({ path: ':memory:', embedder: failingEmbedder })
       
       // Act & Assert - remember should not throw
       await expect(dbWithFailingEmbedder.remember('Test memory')).resolves.toBeDefined()
@@ -109,10 +102,8 @@ describeWithBackends('LimbicDB Semantic Search Tests', (createDb) => {
     })
 
     it('should handle embedding failure during recall gracefully', async () => {
-      // Arrange
-      const dbWithFailingEmbedder = await createDb()
-      // @ts-ignore - configure failing embedder  
-      dbWithFailingEmbedder.configureEmbedder?.(failingEmbedder)
+      // Arrange - create db with failing embedder via public API
+      const dbWithFailingEmbedder = open({ path: ':memory:', embedder: failingEmbedder })
       await dbWithFailingEmbedder.remember('Test memory')
       
       // Act
@@ -185,30 +176,35 @@ describeWithBackends('LimbicDB Semantic Search Tests', (createDb) => {
 
   describe('hybrid search behavior', () => {
     it('should combine keyword and semantic scores', async () => {
-      // Arrange
-      await dbWithEmbedder.remember('Memory with exact keyword match')
-      await dbWithEmbedder.remember('Memory with semantic similarity but no keyword')
-      
-      // Wait for embeddings computation to complete
-      await new Promise(resolve => setTimeout(resolve, 300))
-      
-      // Act
-      const result = await dbWithEmbedder.recall('keyword', { mode: 'hybrid' })
-      
-      // Assert: With embeddings available, should execute hybrid or semantic search
-      expect(result.meta.requestedMode).toBe('hybrid')
-      
-      // Depending on backend and embedding readiness
-      if (result.meta.executedMode === 'hybrid') {
-        expect(result.meta.fallback).toBe(false)
-      } else if (result.meta.executedMode === 'semantic') {
-        expect(result.meta.fallback).toBe(false) // hybrid may fall back to semantic
-      } else {
-        expect(result.meta.fallback).toBe(true)
-        expect(result.meta.executedMode).toBe('keyword')
+      // Arrange - create db with embedder via public API
+      const dbWithEmbedder = open({ path: ':memory:', embedder: mockEmbedder })
+      try {
+        await dbWithEmbedder.remember('Memory with exact keyword match')
+        await dbWithEmbedder.remember('Memory with semantic similarity but no keyword')
+        
+        // Wait for embeddings computation to complete
+        await new Promise(resolve => setTimeout(resolve, 300))
+        
+        // Act
+        const result = await dbWithEmbedder.recall('keyword', { mode: 'hybrid' })
+        
+        // Assert: With embeddings available, should execute hybrid or semantic search
+        expect(result.meta.requestedMode).toBe('hybrid')
+        
+        // Depending on backend and embedding readiness
+        if (result.meta.executedMode === 'hybrid') {
+          expect(result.meta.fallback).toBe(false)
+        } else if (result.meta.executedMode === 'semantic') {
+          expect(result.meta.fallback).toBe(false) // hybrid may fall back to semantic
+        } else {
+          expect(result.meta.fallback).toBe(true)
+          expect(result.meta.executedMode).toBe('keyword')
+        }
+        
+        expect(result.memories.length).toBeGreaterThanOrEqual(1) // At least keyword match
+      } finally {
+        await dbWithEmbedder.close()
       }
-      
-      expect(result.memories.length).toBeGreaterThanOrEqual(1) // At least keyword match
     })
 
     it('should apply correct weighting (30% keyword, 70% semantic)', async () => {
@@ -216,61 +212,73 @@ describeWithBackends('LimbicDB Semantic Search Tests', (createDb) => {
       // Since weights are hardcoded in the implementation, we test the behavior
       // by verifying that hybrid search returns results and reports correct mode
       
-      // Arrange: create memories with varied content
-      await dbWithEmbedder.remember('Exact keyword match contains the keyword phrase')
-      await dbWithEmbedder.remember('Another memory with different content')
-      
-      // Wait for embeddings computation
-      await new Promise(resolve => setTimeout(resolve, 300))
-      
-      // Act: request hybrid search
-      const result = await dbWithEmbedder.recall('keyword', { mode: 'hybrid' })
-      
-      // Assert: should execute hybrid search (not fall back)
-      // With embeddings available, hybrid search should be executed
-      expect(result.meta.requestedMode).toBe('hybrid')
-      
-      // Could be 'hybrid' or 'semantic' depending on implementation
-      // Both are acceptable as long as it's not falling back to keyword
-      if (result.meta.executedMode === 'keyword') {
-        expect(result.meta.fallback).toBe(true)
-      } else {
-        // Should be either 'hybrid' or 'semantic'
-        expect(['hybrid', 'semantic']).toContain(result.meta.executedMode)
-        expect(result.meta.fallback).toBe(false)
+      // Arrange: create db with embedder via public API
+      const dbWithEmbedder = open({ path: ':memory:', embedder: mockEmbedder })
+      try {
+        // create memories with varied content
+        await dbWithEmbedder.remember('Exact keyword match contains the keyword phrase')
+        await dbWithEmbedder.remember('Another memory with different content')
+        
+        // Wait for embeddings computation
+        await new Promise(resolve => setTimeout(resolve, 300))
+        
+        // Act: request hybrid search
+        const result = await dbWithEmbedder.recall('keyword', { mode: 'hybrid' })
+        
+        // Assert: should execute hybrid search (not fall back)
+        // With embeddings available, hybrid search should be executed
+        expect(result.meta.requestedMode).toBe('hybrid')
+        
+        // Could be 'hybrid' or 'semantic' depending on implementation
+        // Both are acceptable as long as it's not falling back to keyword
+        if (result.meta.executedMode === 'keyword') {
+          expect(result.meta.fallback).toBe(true)
+        } else {
+          // Should be either 'hybrid' or 'semantic'
+          expect(['hybrid', 'semantic']).toContain(result.meta.executedMode)
+          expect(result.meta.fallback).toBe(false)
+        }
+        
+        // Should return some results
+        expect(result.memories.length).toBeGreaterThan(0)
+      } finally {
+        await dbWithEmbedder.close()
       }
-      
-      // Should return some results
-      expect(result.memories.length).toBeGreaterThan(0)
     })
 
     it('should handle cases where only one modality returns results', async () => {
-      // Arrange: memory that doesn't contain keyword but is semantically related
-      await dbWithEmbedder.remember('Feline companion animal')
-      
-      // Wait for embeddings computation to complete
-      await new Promise(resolve => setTimeout(resolve, 300))
-      
-      // Act: query with different word but similar meaning
-      const result = await dbWithEmbedder.recall('cat', { mode: 'hybrid' })
-      
-      // Assert: Should find the memory via semantic similarity
-      // The mock embedder creates deterministic embeddings, so "Feline companion animal"
-      // should have some similarity to "cat" in the mock embedding space
-      expect(result.meta.requestedMode).toBe('hybrid')
-      
-      // May return results via semantic similarity
-      // Note: This depends on the mock embedder's deterministic algorithm
-      if (result.memories.length > 0) {
-        // Found via semantic similarity
-        if (result.meta.executedMode === 'hybrid' || result.meta.executedMode === 'semantic') {
-          expect(result.meta.fallback).toBe(false)
+      // Arrange: create db with embedder via public API
+      const dbWithEmbedder = open({ path: ':memory:', embedder: mockEmbedder })
+      try {
+        // memory that doesn't contain keyword but is semantically related
+        await dbWithEmbedder.remember('Feline companion animal')
+        
+        // Wait for embeddings computation to complete
+        await new Promise(resolve => setTimeout(resolve, 300))
+        
+        // Act: query with different word but similar meaning
+        const result = await dbWithEmbedder.recall('cat', { mode: 'hybrid' })
+        
+        // Assert: Should find the memory via semantic similarity
+        // The mock embedder creates deterministic embeddings, so "Feline companion animal"
+        // should have some similarity to "cat" in the mock embedding space
+        expect(result.meta.requestedMode).toBe('hybrid')
+        
+        // May return results via semantic similarity
+        // Note: This depends on the mock embedder's deterministic algorithm
+        if (result.memories.length > 0) {
+          // Found via semantic similarity
+          if (result.meta.executedMode === 'hybrid' || result.meta.executedMode === 'semantic') {
+            expect(result.meta.fallback).toBe(false)
+          }
+        } else {
+          // No semantic similarity detected by mock embedder
+          // Should fall back to keyword
+          expect(result.meta.fallback).toBe(true)
+          expect(result.meta.executedMode).toBe('keyword')
         }
-      } else {
-        // No semantic similarity detected by mock embedder
-        // Should fall back to keyword
-        expect(result.meta.fallback).toBe(true)
-        expect(result.meta.executedMode).toBe('keyword')
+      } finally {
+        await dbWithEmbedder.close()
       }
     })
   })
@@ -289,42 +297,52 @@ describeWithBackends('LimbicDB Semantic Search Tests', (createDb) => {
     })
 
     it('should support semantic mode when embedder available', async () => {
-      // Arrange
-      await dbWithEmbedder.remember('Memory about user preferences')
-      
-      // Wait for embedding computation to complete
-      await new Promise(resolve => setTimeout(resolve, 300))
-      
-      // Act: query with different wording but same meaning
-      const result = await dbWithEmbedder.recall('What does the user like?', { mode: 'semantic' })
-      
-      // Assert: With embeddings available, should execute semantic search
-      // Note: If embeddings are still pending, may fall back to keyword
-      expect(result.meta.requestedMode).toBe('semantic')
-      
-      // Depending on backend and embedding readiness
-      if (result.meta.executedMode === 'semantic') {
-        expect(result.meta.fallback).toBe(false)
-      } else {
-        expect(result.meta.fallback).toBe(true)
-        expect(result.meta.executedMode).toBe('keyword')
+      // Arrange - create db with embedder via public API
+      const dbWithEmbedder = open({ path: ':memory:', embedder: mockEmbedder })
+      try {
+        await dbWithEmbedder.remember('Memory about user preferences')
+        
+        // Wait for embedding computation to complete
+        await new Promise(resolve => setTimeout(resolve, 300))
+        
+        // Act: query with different wording but same meaning
+        const result = await dbWithEmbedder.recall('What does the user like?', { mode: 'semantic' })
+        
+        // Assert: With embeddings available, should execute semantic search
+        // Note: If embeddings are still pending, may fall back to keyword
+        expect(result.meta.requestedMode).toBe('semantic')
+        
+        // Depending on backend and embedding readiness
+        if (result.meta.executedMode === 'semantic') {
+          expect(result.meta.fallback).toBe(false)
+        } else {
+          expect(result.meta.fallback).toBe(true)
+          expect(result.meta.executedMode).toBe('keyword')
+        }
+        
+        expect(result.memories.length).toBeGreaterThanOrEqual(0)
+      } finally {
+        await dbWithEmbedder.close()
       }
-      
-      expect(result.memories.length).toBeGreaterThanOrEqual(0)
     })
 
     it('should include timing information in result meta', async () => {
-      // Arrange
-      await dbWithEmbedder.remember('Timing test memory')
-      await new Promise(resolve => setTimeout(resolve, 100))
-      
-      // Act
-      const result = await dbWithEmbedder.recall('test', { mode: 'semantic' })
-      
-      // Assert
-      expect(result.meta.timing).toBeDefined()
-      expect(result.meta.timing.searchMs).toBeGreaterThanOrEqual(0)
-      expect(result.meta.timing.embedMs).toBeGreaterThanOrEqual(0)
+      // Arrange - create db with embedder via public API
+      const dbWithEmbedder = open({ path: ':memory:', embedder: mockEmbedder })
+      try {
+        await dbWithEmbedder.remember('Timing test memory')
+        await new Promise(resolve => setTimeout(resolve, 100))
+        
+        // Act
+        const result = await dbWithEmbedder.recall('test', { mode: 'semantic' })
+        
+        // Assert
+        expect(result.meta.timing).toBeDefined()
+        expect(result.meta.timing.searchMs).toBeGreaterThanOrEqual(0)
+        expect(result.meta.timing.embedMs).toBeGreaterThanOrEqual(0)
+      } finally {
+        await dbWithEmbedder.close()
+      }
     })
   })
 
@@ -369,31 +387,36 @@ describeWithBackends('LimbicDB Semantic Search Tests', (createDb) => {
     })
 
     it('should track embedding statistics in stats', async () => {
-      // Arrange
-      await dbWithEmbedder.remember('Memory 1')
-      await dbWithEmbedder.remember('Memory 2')
-      // Wait for embeddings to be computed and stored
-      await new Promise(resolve => setTimeout(resolve, 500))
-      
-      // Act - get stats (some backends may have async stats, but sync getter is primary)
-      const stats = dbWithEmbedder.stats
-      
-      // Assert - Should track embeddings count when embedder is configured
-      // Note: embeddingsCount may be undefined if embedding store not initialized yet
-      // or if embeddings haven't been computed yet (async computation).
-      // This is acceptable in alpha - the important thing is that the API exists.
-      
-      // Check if embeddingsCount is defined (it may not be if embeddings are still pending)
-      if (stats.embeddingsCount !== undefined) {
-        expect(stats.embeddingsCount).toBeGreaterThanOrEqual(0) // 0 or more
-        // embeddingsDimensions should be tracked when embeddings are enabled
-        if (stats.embeddingsCount > 0) {
-          expect(stats.embeddingsDimensions).toBe(384)
+      // Arrange - create db with embedder via public API
+      const dbWithEmbedder = open({ path: ':memory:', embedder: mockEmbedder })
+      try {
+        await dbWithEmbedder.remember('Memory 1')
+        await dbWithEmbedder.remember('Memory 2')
+        // Wait for embeddings to be computed and stored
+        await new Promise(resolve => setTimeout(resolve, 500))
+        
+        // Act - get stats (some backends may have async stats, but sync getter is primary)
+        const stats = dbWithEmbedder.stats
+        
+        // Assert - Should track embeddings count when embedder is configured
+        // Note: embeddingsCount may be undefined if embedding store not initialized yet
+        // or if embeddings haven't been computed yet (async computation).
+        // This is acceptable in alpha - the important thing is that the API exists.
+        
+        // Check if embeddingsCount is defined (it may not be if embeddings are still pending)
+        if (stats.embeddingsCount !== undefined) {
+          expect(stats.embeddingsCount).toBeGreaterThanOrEqual(0) // 0 or more
+          // embeddingsDimensions should be tracked when embeddings are enabled
+          if (stats.embeddingsCount > 0) {
+            expect(stats.embeddingsDimensions).toBe(384)
+          }
+        } else {
+          // embeddingsCount is undefined - this is OK for alpha (async computation)
+          // Just verify the stats object structure is intact
+          expect(stats.memoryCount).toBeGreaterThanOrEqual(2)
         }
-      } else {
-        // embeddingsCount is undefined - this is OK for alpha (async computation)
-        // Just verify the stats object structure is intact
-        expect(stats.memoryCount).toBeGreaterThanOrEqual(2)
+      } finally {
+        await dbWithEmbedder.close()
       }
     })
   })

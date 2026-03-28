@@ -1,4 +1,3 @@
-// @ts-nocheck
 /**
  * LimbicDB SQLite Implementation
  * 
@@ -26,6 +25,23 @@ import { classifyMemory, extractTags } from './classify'
 import { computeStrength } from './decay'
 import { parseTime } from './time'
 import { generateId, generateShortId } from './utils/id'
+
+// Minimal types for SQLite adapter boundary
+type SQLiteAdapter = {
+  exec(sql: string): void
+  run(sql: string, ...params: any[]): { changes?: number; lastInsertRowid?: number }
+  get<T = any>(sql: string, ...params: any[]): T | undefined
+  all<T = any>(sql: string, ...params: any[]): T[]
+}
+
+type RawSqliteDbLike = {
+  exec?(sql: string): void
+  prepare(sql: string): {
+    run(...params: any[]): { changes?: number; lastInsertRowid?: number }
+    get<T = any>(...params: any[]): T | undefined
+    all<T = any>(...params: any[]): T[]
+  }
+}
 
 const DEFAULT_DECAY_CONFIG: DecayConfig = {
   enabled: true,
@@ -56,7 +72,7 @@ export class LimbicDBSQLite implements LimbicDB {
     snapshotCount: 0,
     dbSizeBytes: 0
   }
-  private _statsUpdatePromise: Promise<void> | null = null
+
   
   constructor(config: Required<LimbicDBConfig>) {
     this.config = config
@@ -66,16 +82,16 @@ export class LimbicDBSQLite implements LimbicDB {
     // Initialize embedding store if embedder is provided
     if (this._embedder) {
       // Get database connection from store
-      const rawDb = (this.store as any).getRawDb?.()
+      const rawDb = (this.store as any).getRawDb?.() as RawSqliteDbLike | undefined
       // Debug logging removed for production
       if (rawDb) {
         // Create adapter for better-sqlite3 Database
         // better-sqlite3 Database has .prepare() method, Statement has .run(), .get(), .all()
         // Database also has .exec() for DDL
-        const dbAdapter = {
+        const dbAdapter: SQLiteAdapter = {
           exec(sql: string) {
             if (typeof rawDb.exec === 'function') {
-              return rawDb.exec(sql)
+              rawDb.exec(sql)
             } else {
               // Fallback: use prepare for single statement
               rawDb.prepare(sql).run()
@@ -159,19 +175,16 @@ export class LimbicDBSQLite implements LimbicDB {
   }
   
   private startAutoPrune(): void {
-    // @ts-ignore - decay is guaranteed to be DecayConfig
     const intervalMs = this.config.decay.pruneIntervalMinutes * 60 * 1000
     this._pruneIntervalId = setInterval(() => this.autoPrune(), intervalMs)
   }
   
   private async autoPrune(): Promise<void> {
-    // @ts-ignore - decay is guaranteed to be DecayConfig
     if (!this.config.decay.enabled) return
     
-    // @ts-ignore - decay is guaranteed to be DecayConfig
     const threshold = this.config.decay.pruneThreshold
     const beforeTime = Date.now() - 24 * 60 * 60 * 1000 // 24 hours ago
-    const pruned = await this.store.pruneWeakMemories(threshold as number, beforeTime)
+    const pruned = await this.store.pruneWeakMemories(threshold, beforeTime)
     
     if (pruned > 0) {
       await this.store.logEvent({
@@ -473,10 +486,7 @@ export class LimbicDBSQLite implements LimbicDB {
     
     for (const memoryId of topMemoryIds) {
       // Get memory details
-      const memoryResults = await this.store.searchMemories({
-        query: '',
-        limit: 1,
-        minStrength,
+      const memoryResults = await this.store.getMemoriesByFilter({
         ids: [memoryId]
       })
       
@@ -623,10 +633,7 @@ export class LimbicDBSQLite implements LimbicDB {
     
     for (const memoryId of topMemoryIds) {
       // Get memory details
-      const memoryResults = await this.store.searchMemories({
-        query: '',
-        limit: 1,
-        minStrength,
+      const memoryResults = await this.store.getMemoriesByFilter({
         ids: [memoryId]
       })
       
@@ -835,6 +842,7 @@ export class LimbicDBSQLite implements LimbicDB {
     }
     
     // Restore from snapshot using transaction
+    // @ts-expect-error - restoreFromSnapshot is a private method on SQLiteStore
     await (this.store as any).restoreFromSnapshot(snapshot)
     
     // Add restore event

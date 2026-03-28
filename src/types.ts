@@ -173,14 +173,8 @@ export interface LimbicDB {
   readonly stats: LimbicDBStats
   
   // --- Embedding Operations ---
-  // Check if embeddings are available
-  hasEmbeddings?(): boolean
-  
-  // Manually trigger embedding computation for a memory
-  computeEmbedding?(memoryId: string): Promise<void>
-  
-  // Compute embeddings for all memories without embeddings
-  computeAllEmbeddings?(): Promise<number> // returns count of computed embeddings
+  // Note: Embeddings are automatically computed when an embedder is provided
+  // during database creation. There are no manual embedding APIs in this version.
 }
 
 // Factory function type
