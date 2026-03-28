@@ -173,6 +173,64 @@ function checkOverPromises(content, description) {
   return passed
 }
 
+function checkTruthSourceFields(content, description, path) {
+  let passed = true
+  
+  // Only check README and TROUBLESHOOTING for truth source fields
+  if (!path.includes('README') && !path.includes('TROUBLESHOOTING')) {
+    return true
+  }
+  
+  // Check default path references
+  const defaultPathPattern = truth.defaultPath
+  if (!content.includes(defaultPathPattern) && path.includes('README')) {
+    console.log(`⚠️  ${description}: Should mention default path "${defaultPathPattern}"`)
+  }
+  
+  // Check SQLite capability labels
+  const sqliteKeywordLabel = truth.sqlite.keyword
+  const sqliteSemanticLabel = truth.sqlite.semantic
+  const sqliteHybridLabel = truth.sqlite.hybrid
+  
+  // Look for capability tables or descriptions
+  if (content.includes('SQLite') || content.includes('sqlite')) {
+    // Check for keyword capability
+    if (content.toLowerCase().includes('keyword') && content.includes('SQLite')) {
+      // We could add more specific checks here if needed
+    }
+    
+    // Check for semantic capability label consistency
+    if (content.includes('semantic') && content.includes('SQLite')) {
+      // Look for descriptions that might mention experimental-mvp status
+      if (content.includes('experimental') || content.includes('MVP') || content.includes('mvp')) {
+        // Good indication that capability label is consistent
+      } else if (content.includes('stable semantic') || content.includes('full semantic')) {
+        console.log(`⚠️  ${description}: SQLite semantic search described as stable/full but truth source says "${sqliteSemanticLabel}"`)
+      }
+    }
+  }
+  
+  // Check memory backend capability labels
+  const memoryKeywordLabel = truth.memory.keyword
+  const memorySemanticLabel = truth.memory.semantic
+  const memoryHybridLabel = truth.memory.hybrid
+  
+  // Check snapshot embeddings truth
+  if (truth.sqlite.snapshotEmbeddings && truth.memory.snapshotEmbeddings) {
+    // Both backends should have snapshot embeddings
+    if (content.includes('snapshot') && content.includes('embedding')) {
+      // Check for negative claims
+      if (content.includes('snapshot does not contain embeddings') || 
+          content.includes('embeddings are lost in snapshot')) {
+        console.log(`❌ ${description}: Claims embeddings lost in snapshot but truth source says snapshotEmbeddings: true`)
+        passed = false
+      }
+    }
+  }
+  
+  return passed
+}
+
 // Main check loop
 for (const { path, description, requireVersion } of docsToCheck) {
   try {
@@ -187,6 +245,7 @@ for (const { path, description, requireVersion } of docsToCheck) {
       checkNpmScripts(content, description, path),
       checkSnapshotClaims(content, description, path),
       checkOverPromises(content, description),
+      checkTruthSourceFields(content, description, path),
     ]
     
     if (checks.includes(false)) {
@@ -211,5 +270,6 @@ if (allPassed) {
   console.log('3. Fix references to non-existent npm scripts')
   console.log('4. Verify snapshot embedding claims are accurate')
   console.log('5. Remove over-promising language')
+  console.log('6. Ensure truth source fields (default path, capability labels) are consistent')
   process.exit(1)
 }
