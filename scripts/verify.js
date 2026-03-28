@@ -6,6 +6,7 @@
  */
 
 import { open } from '../dist/index.js'
+import { rmSync } from 'node:fs'
 
 async function runTest(name, testFn) {
   try {
@@ -95,6 +96,32 @@ async function main() {
     if (typeof stats.stateKeyCount !== 'number') throw new Error('状态键计数无效')
   })
   
+  // 测试 7: 持久化文件路径（README 的 Path 1）
+  allPassed &= await runTest('持久化文件路径 (README Path 1)', async () => {
+    const filePath = './verify-durable-test.limbic'
+    const durableDb = open(filePath)
+    
+    try {
+      // 基本操作测试
+      await durableDb.remember('持久化测试记忆')
+      await durableDb.set('test', { value: 123 })
+      
+      const result = await durableDb.recall('持久化')
+      if (result.memories.length === 0) throw new Error('持久化数据库检索失败')
+      
+      // 重新打开验证持久化
+      await durableDb.close()
+      const reopenedDb = open(filePath)
+      const reopenedResult = await reopenedDb.recall('持久化')
+      await reopenedDb.close()
+      
+      if (reopenedResult.memories.length === 0) throw new Error('重新打开后记忆丢失')
+    } finally {
+      // 清理测试文件
+      try { rmSync(filePath, { force: true }) } catch {}
+    }
+  })
+  
   // 清理
   await db.close()
   
@@ -107,12 +134,7 @@ async function main() {
     process.exit(1)
   }
   
-  console.log('\n💡 下一步:')
-  console.log('1. git init && git add . && git commit -m "initial commit"')
-  console.log('2. 创建 GitHub 仓库: github.com/new')
-  console.log('3. git remote add origin && git push')
-  console.log('4. npm run build')
-  console.log('5. npm publish --tag alpha (需要登录)')
+
 }
 
 main().catch(error => {
