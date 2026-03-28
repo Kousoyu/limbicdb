@@ -175,14 +175,16 @@ export class LimbicDBSQLite implements LimbicDB {
   }
   
   private startAutoPrune(): void {
-    const intervalMs = this.config.decay.pruneIntervalMinutes * 60 * 1000
+    const decay = this.config.decay as DecayConfig
+    const intervalMs = decay.pruneIntervalMinutes * 60 * 1000
     this._pruneIntervalId = setInterval(() => this.autoPrune(), intervalMs)
   }
   
   private async autoPrune(): Promise<void> {
-    if (!this.config.decay.enabled) return
+    const decay = this.config.decay as DecayConfig
+    if (!decay.enabled) return
     
-    const threshold = this.config.decay.pruneThreshold
+    const threshold = decay.pruneThreshold
     const beforeTime = Date.now() - 24 * 60 * 60 * 1000 // 24 hours ago
     const pruned = await this.store.pruneWeakMemories(threshold, beforeTime)
     
@@ -256,9 +258,6 @@ export class LimbicDBSQLite implements LimbicDB {
   
   async recall(query: string, options?: RecallOptions): Promise<RecallResult> {
     const startTime = Date.now()
-    const now = startTime
-    const limit = options?.limit || 10
-    const minStrength = options?.minStrength || 0.01
     const requestedMode = options?.mode || 'keyword'
     
     // Determine what mode can actually be executed
@@ -492,7 +491,7 @@ export class LimbicDBSQLite implements LimbicDB {
       
       if (memoryResults.length === 0) continue
       
-      const memory = memoryResults[0]
+      const memory = memoryResults[0]!
       
       // Update access stats
       const newStrength = computeStrength(
@@ -639,7 +638,7 @@ export class LimbicDBSQLite implements LimbicDB {
       
       if (memoryResults.length === 0) continue
       
-      const memory = memoryResults[0]
+      const memory = memoryResults[0]!
       
       // Update access stats
       const newStrength = computeStrength(
@@ -842,7 +841,6 @@ export class LimbicDBSQLite implements LimbicDB {
     }
     
     // Restore from snapshot using transaction
-    // @ts-expect-error - restoreFromSnapshot is a private method on SQLiteStore
     await (this.store as any).restoreFromSnapshot(snapshot)
     
     // Add restore event
