@@ -7,18 +7,18 @@ English | [简体中文](./README.zh-CN.md)
 Store what matters, recall it with context, and inspect why it was used — in a single local file.
 
 > **Current Status (v0.4.0-alpha.3)**: 
-> - **SQLite backend**: Stable keyword search, verified semantic/hybrid search MVP
-> - **Memory backend**: Verified semantic/hybrid search implementation
-> - **Snapshot parity**: Embeddings included in snapshots (both backends)
-> - **Release discipline**: CI/CD, version consistency, example validation
+> - **SQLite backend**: Keyword search (stable), semantic/hybrid search (experimental-mvp)
+> - **Memory backend**: Keyword search (stable), semantic/hybrid search (experimental, bring-your-own embedder)
+> - **Snapshot parity**: Embeddings included in snapshots (both backends, alpha feature)
+> - **Release discipline**: CI/CD, version consistency, example validation (alpha rigor)
 
 ## Backend Capability Matrix
 
 | Feature | SQLite Backend (`open('./agent.limbic')`) | Memory Backend (`open(':memory:')`) |
 |---------|-------------------------------------------|-------------------------------------|
-| **Keyword search** | ✅ Stable (FTS5 + LIKE fallback) | ✅ Stable |
-| **Semantic search** | 🧪 Experimental (MVP) | ✅ Experimental (bring-your-own embedder) |
-| **Hybrid search** | 🧪 Experimental (MVP) | ✅ Experimental (70% semantic, 30% keyword) |
+| **Keyword search** | stable (FTS5 + LIKE fallback) | stable |
+| **Semantic search** | 🧪 Experimental (MVP) | 🧪 Experimental (bring-your-own embedder) |
+| **Hybrid search** | 🧪 Experimental (MVP) | 🧪 Experimental (70% semantic, 30% keyword) |
 | **Persistent storage** | ✅ Single `.limbic` file | ❌ Volatile (in-memory only) |
 | **Snapshot/Restore** | ✅ (with embeddings) | ✅ (with embeddings) |
 | **File-based** | ✅ | ❌ |
@@ -145,7 +145,7 @@ Key topics covered:
 ## Current Implementation Status
 
 ### SQLite Backend (`open('./agent.limbic')`)
-**Current (stable)**:
+**Current (alpha)**:
 * ✅ **One-file storage** - `.limbic` SQLite file format
 * ✅ **Keyword search** - FTS5 + LIKE fallback for English and basic CJK
 * ✅ **Memory lifecycle** - remember, recall, forget, inspect, history
@@ -160,7 +160,7 @@ Key topics covered:
 * ✅ **Snapshot parity** - embeddings now included in snapshots
 
 ### Memory Backend (`open(':memory:')`)
-**Current (stable)**:
+**Current (alpha)**:
 * ✅ **Keyword search** - local text matching
 * ✅ **Memory lifecycle** - full lifecycle operations
 * ✅ **Auto-classification** - same as SQLite backend
@@ -188,7 +188,7 @@ To set clear expectations about what kind of search works today:
 | **Chinese/CJK exact term** | 🔄 Improving | FTS5 + LIKE fallback works for exact matches (tested) |
 | **Chinese/CJK partial match** | 🔄 Improving | LIKE fallback provides substring matching (tested) |
 | **Mixed CJK + English** | 🔄 Improving | Hybrid approach handles mixed queries (tested) |
-| **Semantic/embedding search** | 🧪 Experimental (bring-your-own embedder) | Memory backend fully implemented, SQLite backend experimental MVP |
+| **Semantic/embedding search** | 🧪 Experimental (bring-your-own embedder) | Memory backend experimental, SQLite backend experimental MVP |
 
 **Status Key:**
 * ✅ **Stable** - Reliable, tested, ready for use
@@ -204,7 +204,7 @@ LimbicDB is evolving toward a reliable memory runtime with:
 * inspectable retrieval decisions
 * retention and pruning policies
 * compaction for long-lived memory stores
-* stable local file formats for embedded use
+* reliable local file formats for embedded use
 
 ## How LimbicDB compares
 
@@ -216,7 +216,7 @@ This table helps you decide if it fits your use case.
 | **What it is** | Memory lifecycle engine | Memory-as-a-service | Memory modules for chains | Vector database | DIY |
 | **Local, no server** | ✅ Single `.limbic` file | ⚠️ Has local mode, but designed for cloud | ✅ | ✅ | ✅ |
 | **No API keys needed** | ✅ | ❌ (cloud) / ✅ (local) | ✅ | ✅ | ✅ |
-| **Semantic search** | 🧪 Experimental (both backends, bring-your-own embedder) | ✅ Built-in | ✅ Via vector stores | ✅ Core feature | ❌ |
+| **Semantic search** | 🧪 Experimental (both backends, bring-your-own embedder) | ✅ Built-in | ✅ Via vector stores | stable feature | ❌ |
 | **Keyword search** | ✅ FTS5 + LIKE fallback | ✅ | ✅ | ⚠️ Limited | ❌ |
 | **Memory decay / forgetting** | ✅ Half-life model | ⚠️ Basic | ❌ | ❌ | ❌ |
 | **Auto-classification** | ✅ fact/episode/preference/procedure/goal | ❌ | ❌ | ❌ | ❌ |
@@ -319,7 +319,7 @@ LimbicDB is built around a simple but powerful core:
 
 1. **Storage Abstraction**
    - In-memory store (fast, for development)
-   - SQLite store (durable, for production)
+   - SQLite store (durable, for persistent scenarios)
    - Unified interface for future backends
 
 2. **Memory Lifecycle**

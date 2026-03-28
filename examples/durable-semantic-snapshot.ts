@@ -41,10 +41,10 @@ const mockEmbedder = {
 
 async function main() {
   console.log('=== LimbicDB Durable Storage Example ===\n')
-  console.log('This example shows the recommended setup for agent memory:')
+  console.log('This example shows the alpha evaluation setup for agent memory:')
   console.log('- Persistent SQLite database (./agent.limbic file)')
-  console.log('- Embeddings for semantic search')
-  console.log('- Snapshot/restore for backups\n')
+  console.log('- Embeddings for semantic search (experimental-mvp)')
+  console.log('- Snapshot/restore for backups (alpha reliability)\n')
   
   const dbPath = './agent.limbic'
   
@@ -217,17 +217,18 @@ async function main() {
     }
     
     console.log('\n=== Example Complete ===')
-    console.log('\nKey takeaways:')
-    console.log('1. Use file path (./agent.limbic) for persistent storage')
-    console.log('2. Add embedder config to enable semantic/hybrid search')
+    console.log('\nAlpha key takeaways:')
+    console.log('1. Default path (./agent.limbic) provides durable storage (alpha reliability)')
+    console.log('2. Embedder config enables semantic/hybrid search (experimental-mvp)')
     console.log('3. Snapshots capture memories, state, timeline, and embeddings')
-    console.log('4. Restore brings back everything including embeddings')
-    console.log('5. Database persists across application restarts')
-    console.log('\nFor alpha evaluation:')
-    console.log('- Replace mockEmbedder with your actual model (OpenAI, local, etc.)')
-    console.log('- Schedule regular snapshots for backup')
-    console.log('- Use hybrid search (experimental-mvp) or keyword search (stable)')
-    console.log('- Monitor executedMode and fallback to understand alpha behavior')
+    console.log('4. Restore brings back everything including embeddings (alpha feature)')
+    console.log('5. Database persists across application restarts (core promise)')
+    console.log('\nAlpha evaluation guidance:')
+    console.log('- Replace mockEmbedder with your actual embedding model (OpenAI, local, etc.)')
+    console.log('- Schedule regular snapshots for backup (alpha feature reliability)')
+    console.log('- Use hybrid search (experimental) or keyword search (stable fallback)')
+    console.log('- Monitor executedMode and fallback flags to understand alpha behavior')
+    console.log('- Semantic search may fall back to keyword depending on embedding availability')
     
   } finally {
     // Final cleanup

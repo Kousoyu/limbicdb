@@ -55,7 +55,11 @@ async function main() {
     })
     
     console.log(`   Found ${searchResults.memories.length} relevant memories`)
-    console.log(`   Search mode: ${searchResults.meta.requestedMode} -> ${searchResults.meta.executedMode} ${searchResults.meta.fallback ? '(fallback)' : ''}`)
+    console.log(`   Search mode: requested=${searchResults.meta.requestedMode}, executed=${searchResults.meta.executedMode}`)
+    console.log(`   Fallback: ${searchResults.meta.fallback}`)
+    if (searchResults.meta.pendingEmbeddings !== undefined) {
+      console.log(`   Pending embeddings: ${searchResults.meta.pendingEmbeddings}`)
+    }
     
     if (searchResults.memories.length > 0) {
       console.log('   Top memories:')
@@ -109,7 +113,11 @@ async function main() {
     })
     
     console.log(`   Found ${postRestoreSearch.memories.length} relevant memories`)
-    console.log(`   Search mode: ${postRestoreSearch.meta.requestedMode} -> ${postRestoreSearch.meta.executedMode} ${postRestoreSearch.meta.fallback ? '(fallback)' : ''}`)
+    console.log(`   Search mode: requested=${postRestoreSearch.meta.requestedMode}, executed=${postRestoreSearch.meta.executedMode}`)
+    console.log(`   Fallback: ${postRestoreSearch.meta.fallback}`)
+    if (postRestoreSearch.meta.pendingEmbeddings !== undefined) {
+      console.log(`   Pending embeddings: ${postRestoreSearch.meta.pendingEmbeddings}`)
+    }
     
     console.log('\n=== Demo Complete ===')
     console.log('\nNote: This demo shows the snapshot/restore functionality.')

@@ -231,6 +231,105 @@ function checkTruthSourceFields(content, description, path) {
   return passed
 }
 
+function checkCapabilityLabels(content, description, path) {
+  let passed = true
+  
+  // Only check README files for capability labels
+  if (!path.includes('README')) {
+    return true
+  }
+  
+  // Helper to check if a capability label is correctly represented
+  const checkLabel = (backend, capability, truthLabel) => {
+    // For README files, we look for the capability matrix
+    // We'll do simple pattern matching for now
+    
+    // Build search patterns based on backend and capability
+    let backendPattern = backend === 'sqlite' ? /SQLite.*backend/i : /memory.*backend/i
+    let capabilityPattern
+    
+    switch (capability) {
+      case 'keyword':
+        capabilityPattern = /keyword.*search/i
+        break
+      case 'semantic':
+        capabilityPattern = /semantic.*search/i
+        break
+      case 'hybrid':
+        capabilityPattern = /hybrid.*search/i
+        break
+      default:
+        return true
+    }
+    
+    // Check if the section exists
+    if (backendPattern.test(content) && capabilityPattern.test(content)) {
+      // Look for the truth label in the vicinity
+      // Simple check: see if the truth label appears near the capability
+      // This is a heuristic but better than nothing
+      const lines = content.split('\n')
+      for (let i = 0; i < lines.length; i++) {
+        const line = lines[i]
+        if (backendPattern.test(line) && capabilityPattern.test(line)) {
+          // Check this line and the next few lines for the label
+          const context = lines.slice(i, Math.min(i + 3, lines.length)).join(' ')
+          
+          // Truth label should appear in context
+          // For 'stable', check for 'stable' (case-insensitive)
+          // For 'experimental' or 'experimental-mvp', check for 'experimental'
+          const expectedPattern = truthLabel === 'stable' ? /stable/i : /experimental/i
+          if (!expectedPattern.test(context)) {
+            console.log(`⚠️  ${description}: ${backend} ${capability} should be labeled "${truthLabel}" but not found in context`)
+            // Not marking as failure, just warning for now
+          }
+          
+          // Special check for experimental-mvp: should mention MVP
+          if (truthLabel === 'experimental-mvp' && !/MVP|mvp/i.test(context)) {
+            console.log(`⚠️  ${description}: ${backend} ${capability} is experimental-mvp but MVP not mentioned`)
+          }
+          
+          break
+        }
+      }
+    }
+    
+    return true
+  }
+  
+  // Check all capability labels
+  checkLabel('sqlite', 'keyword', truth.sqlite.keyword)
+  checkLabel('sqlite', 'semantic', truth.sqlite.semantic)
+  checkLabel('sqlite', 'hybrid', truth.sqlite.hybrid)
+  checkLabel('memory', 'keyword', truth.memory.keyword)
+  checkLabel('memory', 'semantic', truth.memory.semantic)
+  checkLabel('memory', 'hybrid', truth.memory.hybrid)
+  
+  // Check snapshot embeddings
+  if (truth.sqlite.snapshotEmbeddings) {
+    // Should not contain negative claims about SQLite snapshot embeddings
+    if (content.includes('SQLite') && content.includes('snapshot') && 
+        (content.includes('does not contain embeddings') || 
+         content.includes('embeddings are lost') ||
+         content.includes('尚未包含'))) {
+      console.log(`❌ ${description}: SQLite snapshot incorrectly claims embeddings not included`)
+      passed = false
+    }
+  }
+  
+  if (truth.memory.snapshotEmbeddings) {
+    // Should not contain negative claims about memory snapshot embeddings
+    if (content.includes('memory') && content.includes('snapshot') && 
+        (content.includes('does not contain embeddings') || 
+         content.includes('embeddings are lost') ||
+         content.includes('尚未包含'))) {
+      console.log(`❌ ${description}: Memory snapshot incorrectly claims embeddings not included`)
+      passed = false
+    }
+  }
+  
+  return passed
+}
+
 // Main check loop
 for (const { path, description, requireVersion } of docsToCheck) {
   try {
@@ -246,6 +345,7 @@ for (const { path, description, requireVersion } of docsToCheck) {
       checkSnapshotClaims(content, description, path),
       checkOverPromises(content, description),
       checkTruthSourceFields(content, description, path),
+      checkCapabilityLabels(content, description, path),
     ]
     
     if (checks.includes(false)) {
