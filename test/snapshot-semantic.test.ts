@@ -3,6 +3,7 @@ import { open } from '../src/index'
 import { Embedder } from '../src/types'
 import fs from 'fs/promises'
 import path from 'path'
+import os from 'os'
 
 // Mock embedder for testing
 const mockEmbedder: Embedder = {
@@ -26,7 +27,7 @@ describe('Snapshot and Semantic Search Integration', () => {
     let tempFilePath: string
     
     beforeEach(() => {
-      tempFilePath = `/tmp/limbicdb-snapshot-test-${Date.now()}.limbic`
+      tempFilePath = `${os.tmpdir()}/limbicdb-snapshot-test-${Date.now()}.limbic`
     })
     
     afterEach(async () => {
