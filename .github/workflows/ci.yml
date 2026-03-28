@@ -240,3 +240,6 @@ jobs:
         fi
         
         echo "✓ Version consistency check passed"
+    
+    - name: Check documentation consistency
+      run: npm run check:docs

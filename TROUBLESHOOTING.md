@@ -120,14 +120,14 @@ const memory = open({
 
 ```javascript
 // From memory to SQLite (with embeddings)
-const memoryBackend = open(':memory:', { embedder })
+const memoryBackend = open({ path: ':memory:', embedder })
 await memoryBackend.remember('Important memory')
 
 // Take snapshot
 const snapshotId = await memoryBackend.snapshot()
 
 // Open SQLite backend
-const sqliteBackend = open('./agent.limbic', { embedder })
+const sqliteBackend = open({ path: './agent.limbic', embedder })
 
 // Restore snapshot (embeddings included)
 await sqliteBackend.restore(snapshotId)

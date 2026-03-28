@@ -45,6 +45,8 @@
     "benchmark": "tsx benchmarks/search-benchmark.ts",
     "benchmark:baseline": "tsx benchmarks/performance-baseline.ts",
     "smoketest": "npm run typecheck && npm run test && npm run build && npm pack --dry-run",
+    "verify:examples": "node scripts/verify-examples.js",
+    "check:docs": "node scripts/check-docs-consistency.js",
     "prepublishOnly": "npm run build && npm run verify && npm run smoketest"
   },
   "dependencies": {
