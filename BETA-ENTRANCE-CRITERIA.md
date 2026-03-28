@@ -21,7 +21,7 @@ These are the criteria LimbicDB must meet before moving from **alpha** to **beta
 **Current status**: 🔄 **Partial** - Basic examples verified; semantic examples need manual setup
 
 **Requirements**:
-- [ ] `npm run verify-examples` command that tests all examples
+- [ ] `npm run verify:examples` command that tests all examples
 - [ ] CI runs example tests on all supported Node versions (20, 22, 24)
 - [ ] No example requires API keys or external services
 - [ ] Examples handle edge cases gracefully (e.g., missing embeddings)

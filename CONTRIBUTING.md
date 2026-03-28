@@ -51,10 +51,10 @@ npm run build
 ### Development Scripts
 ```bash
 # Run tests in watch mode
-npm run test:watch
+npm run test
 
 # Build and watch for changes
-npm run build:watch
+npm run dev
 
 # Type checking
 npm run typecheck

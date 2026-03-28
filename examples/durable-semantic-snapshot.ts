@@ -5,9 +5,9 @@
  * Demonstrates using LimbicDB with persistent file storage, embeddings,
  * and snapshot/restore functionality.
  * 
- * This is the recommended setup for production-like usage:
+ * This is a durable semantic MVP path for alpha evaluation:
  * - Persistent SQLite database (./agent.limbic)
- * - Embeddings for semantic search
+ * - Embeddings for semantic search (experimental-mvp)
  * - Snapshots for backup and restore
  * 
  * Usage:
@@ -223,10 +223,11 @@ async function main() {
     console.log('3. Snapshots capture memories, state, timeline, and embeddings')
     console.log('4. Restore brings back everything including embeddings')
     console.log('5. Database persists across application restarts')
-    console.log('\nFor production:')
+    console.log('\nFor alpha evaluation:')
     console.log('- Replace mockEmbedder with your actual model (OpenAI, local, etc.)')
     console.log('- Schedule regular snapshots for backup')
-    console.log('- Use hybrid search for best results (70% semantic, 30% keyword)')
+    console.log('- Use hybrid search (experimental-mvp) or keyword search (stable)')
+    console.log('- Monitor executedMode and fallback to understand alpha behavior')
     
   } finally {
     // Final cleanup

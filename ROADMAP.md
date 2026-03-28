@@ -18,7 +18,7 @@
 
 ## Phase 1: Trust Foundation (v0.4.x)
 
-### v0.4.0-alpha.2 (Target: 7 days)
+### Current Alpha Status (v0.4.0-alpha.3)
 - [x] Contract truthfulness in `recall()` results
 - [ ] README that separates memory vs. SQLite backend capabilities
 - [ ] Clear documentation of current semantic search limitations

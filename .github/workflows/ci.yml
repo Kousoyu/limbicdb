@@ -39,42 +39,8 @@ jobs:
     - name: Build
       run: npm run build
     
-    - name: Run example smoke tests
-      run: |
-        # Test that the main README examples work
-        echo "Testing semantic-recall example..."
-        npx tsx examples/semantic-recall.ts 
-        
-        echo "Testing durable-semantic-snapshot example..."
-        npx tsx examples/durable-semantic-snapshot.ts 
-        
-        echo "Testing basic usage example..."
-        # Create a simple test script based on README basic usage
-        cat > test-basic.js << "EOF"
-        import { open } from "./dist/index.js"
-        import { rmSync } from "node:fs"
-        
-        async function test() {
-          const memory = open("./test-basic.limbic")
-          try {
-            await memory.remember("User is allergic to nuts")
-            await memory.remember("Project deadline is Friday")
-            
-            const result = await memory.recall("allergies")
-            console.log("Basic test passed:", result.memories.length > 0)
-          } finally {
-            await memory.close()
-            // Clean up test file
-            try { rmSync("./test-basic.limbic", { force: true }) } catch {}
-          }
-        }
-        
-        test().catch(err => {
-          console.error("Basic test failed:", err)
-          process.exit(1)
-        })
-        EOF
-        node test-basic.js
+    - name: Verify examples
+      run: npm run verify:examples
     
     - name: Verify package
       run: npm run verify
@@ -240,3 +206,6 @@ jobs:
         fi
         
         echo "✓ Version consistency check passed"
+    
+    - name: Check documentation consistency
+      run: npm run check:docs
