@@ -59,6 +59,14 @@ const memoryWithEmbedder = open({
 const results = await memoryWithEmbedder.recall('query', { mode: 'semantic' })
 ```
 
+## Development Requirements
+
+- **Node.js**: 20.19.0+, 22.13.0+, or 24.0.0+ (required by ESLint 10 & Vitest 4)
+- **npm**: 10+ or equivalent
+- **TypeScript**: 5.4+
+
+**Note for contributors**: The development toolchain requires newer Node.js versions. The published npm package may support older Node.js versions for runtime usage.
+
 ## Why LimbicDB
 
 Most agent memory tools focus on storage or retrieval alone. LimbicDB is built around the full memory lifecycle:

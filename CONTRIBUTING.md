@@ -28,8 +28,8 @@ LimbicDB follows a **product truthfulness first** philosophy:
 ## Development Setup
 
 ### Prerequisites
-- Node.js 18+ 
-- npm 9+
+- Node.js 20.19.0+, 22.13.0+, or 24.0.0+ (required by ESLint 10 Node.js 18+ Vitest 4) 
+- npm 10+
 - Git
 
 ### Local Setup
