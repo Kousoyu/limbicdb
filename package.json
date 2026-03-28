@@ -47,7 +47,9 @@
     "smoketest": "npm run typecheck && npm run test && npm run build && npm pack --dry-run",
     "verify:examples": "node scripts/verify-examples.js",
     "check:docs": "node scripts/check-docs-consistency.js",
-    "prepublishOnly": "npm run build && npm run verify && npm run smoketest"
+    "verify:public-contracts": "tsx scripts/verify-public-contracts.js",
+    "release:check": "node scripts/release-check.js",
+    "prepublishOnly": "npm run smoketest && npm run release:check"
   },
   "dependencies": {
     "better-sqlite3": "^11.0.0"

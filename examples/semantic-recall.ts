@@ -96,8 +96,12 @@ async function main() {
     limit: 3,
   });
   
-  console.log(`Mode: ${semanticResult.meta.mode}, Fallback: ${semanticResult.meta.fallback}`);
-  console.log(`Embed: ${semanticResult.meta.timing.embedMs || 0}ms, Search: ${semanticResult.meta.timing.searchMs}ms`);
+  console.log(`Mode: requested=${semanticResult.meta.requestedMode}, executed=${semanticResult.meta.executedMode}`);
+  console.log(`Fallback: ${semanticResult.meta.fallback}`);
+  if (semanticResult.meta.pendingEmbeddings !== undefined) {
+    console.log(`Pending embeddings: ${semanticResult.meta.pendingEmbeddings}`);
+  }
+  console.log(`Timing: embed=${semanticResult.meta.timing.embedMs || 0}ms, search=${semanticResult.meta.timing.searchMs}ms`);
   console.log('Top results:');
   for (const mem of semanticResult.memories) {
     // Note: score field will be added when semantic search is fully implemented
@@ -114,7 +118,11 @@ async function main() {
     limit: 3,
   });
   
-  console.log(`Mode: ${hybridResult.meta.mode}`);
+  console.log(`Mode: requested=${hybridResult.meta.requestedMode}, executed=${hybridResult.meta.executedMode}`);
+  console.log(`Fallback: ${hybridResult.meta.fallback}`);
+  if (hybridResult.meta.pendingEmbeddings !== undefined) {
+    console.log(`Pending embeddings: ${hybridResult.meta.pendingEmbeddings}`);
+  }
   console.log('Top results:');
   for (const mem of hybridResult.memories) {
     console.log(`  ${mem.content.substring(0, 60)}...`);
@@ -130,7 +138,8 @@ async function main() {
     limit: 2,
   });
   
-  console.log(`Mode: ${keywordResult.meta.mode}`);
+  console.log(`Mode: requested=${keywordResult.meta.requestedMode}, executed=${keywordResult.meta.executedMode}`);
+  console.log(`Fallback: ${keywordResult.meta.fallback}`);
   console.log('Top results:');
   for (const mem of keywordResult.memories) {
     console.log(`  ${mem.content.substring(0, 60)}...`);
@@ -147,8 +156,9 @@ async function main() {
     mode: 'semantic', // Request semantic but no embedder
   });
   
-  console.log(`Requested: semantic, Actual: ${fallbackResult.meta.mode}, Fallback: ${fallbackResult.meta.fallback}`);
-  console.log(`Still returned ${fallbackResult.memories.length} result(s) using keyword search`);
+  console.log(`Mode: requested=${fallbackResult.meta.requestedMode}, executed=${fallbackResult.meta.executedMode}`);
+  console.log(`Fallback: ${fallbackResult.meta.fallback}`);
+  console.log(`Still returned ${fallbackResult.memories.length} result(s) using ${fallbackResult.meta.executedMode} search`);
   
   // Step 8: Stats show embedding count
   console.log('\n8. Statistics with embedding count');
