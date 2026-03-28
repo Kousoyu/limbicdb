@@ -18,11 +18,11 @@ These are the criteria LimbicDB must meet before moving from **alpha** to **beta
 
 ## 2. All README Examples Run Without Modification
 
-**Current status**: ✅ **Good** - All examples verified in CI
+**Current status**: 🔄 **Partial** - Basic examples verified; semantic examples need manual setup
 
 **Requirements**:
 - [ ] `npm run verify-examples` command that tests all examples
-- [ ] CI runs example tests on all Node versions (18, 20, 22)
+- [ ] CI runs example tests on all supported Node versions (20, 22, 24)
 - [ ] No example requires API keys or external services
 - [ ] Examples handle edge cases gracefully (e.g., missing embeddings)
 
@@ -72,7 +72,7 @@ These are the criteria LimbicDB must meet before moving from **alpha** to **beta
 | Criterion | Status | Notes |
 |-----------|--------|-------|
 | 1. Default path clarity | 🔄 **Partial** | Need explicit warnings about SQLite semantic search limitations |
-| 2. Examples run | ✅ **Good** | All examples verified in CI |
+| 2. Examples run | 🔄 **Partial** | Most examples run; semantic-recall.ts requires manual embedder setup |
 | 3. CI stable | ✅ **Good** | CI established, need to prove stability |
 | 4. npm install stable | ✅ **Good** | Smoke test established |
 | 5. No doc/reality gaps | 🔄 **Improving** | Limitations documented but need more clarity |

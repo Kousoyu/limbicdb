@@ -2,7 +2,7 @@
 
 > A transparent view of what's next for LimbicDB
 
-## Current Version: v0.4.0-alpha.1
+## Current Version: v0.4.0-alpha.3
 
 **Focus**: Establishing trust through **product truthfulness**
 
