@@ -2,7 +2,7 @@
 
 > A transparent view of what's next for LimbicDB
 
-## Current Version: v0.4.0-alpha.3
+## Current Version: v1.0.0-beta.1
 
 **Focus**: Establishing trust through **product truthfulness**
 
@@ -18,7 +18,7 @@
 
 ## Phase 1: Trust Foundation (v0.4.x)
 
-### Current Alpha Status (v0.4.0-alpha.3)
+### Current Alpha Status (v1.0.0-beta.1)
 - [x] Contract truthfulness in `recall()` results
 - [ ] README that separates memory vs. SQLite backend capabilities
 - [ ] Clear documentation of current semantic search limitations

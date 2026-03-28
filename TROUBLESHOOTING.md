@@ -2,7 +2,7 @@
 
 Common issues and solutions for LimbicDB.
 
-> **Status**: Alpha (v0.4.0-alpha.3) - These are the most common "trust-breaking" issues.
+> **Status**: Alpha (v1.0.0-beta.1) - These are the most common "trust-breaking" issues.
 
 ## Quick Diagnosis
 
@@ -338,4 +338,4 @@ If you're stuck:
 
 ---
 
-*Last updated: 2026-03-28 (v0.4.0-alpha.3)*
+*Last updated: 2026-03-28 (v1.0.0-beta.1)*

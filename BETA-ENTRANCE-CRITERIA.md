@@ -1,6 +1,6 @@
 # Beta Entrance Criteria
 
-> **Status**: Currently in alpha (v0.4.0-alpha.3). Beta criteria not yet met.
+> **Status**: Currently in alpha (v1.0.0-beta.1). Beta criteria not yet met.
 
 These are the criteria LimbicDB must meet before moving from **alpha** to **beta**. Beta means "ready for early adopters with clear expectations".
 
@@ -67,7 +67,7 @@ These are the criteria LimbicDB must meet before moving from **alpha** to **beta
 
 ---
 
-## Current Assessment (v0.4.0-alpha.3)
+## Current Assessment (v1.0.0-beta.1)
 
 | Criterion | Status | Notes |
 |-----------|--------|-------|
@@ -132,4 +132,4 @@ The goal is to reach a state where early adopters can recommend LimbicDB to othe
 
 ---
 
-*Last updated: 2026-03-28 (v0.4.0-alpha.3)*
+*Last updated: 2026-03-28 (v1.0.0-beta.1)*
