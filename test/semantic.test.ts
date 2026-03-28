@@ -461,7 +461,7 @@ describeWithBackends('LimbicDB Semantic Search Tests', ({ createDb, createDbWith
       // Default example: open('./agent.limbic') -> SQLite backend
       
       // Create a temporary file path
-      const tempFilePath = '/tmp/limbicdb-smoke-test.limbic'
+      const tempFilePath = os.tmpdir() + '/limbicdb-smoke-test.limbic'
       
       try {
         // Simulate README example with embedder
