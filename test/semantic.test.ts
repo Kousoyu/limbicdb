@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest'
 import fs from 'fs'
+import os from 'os'
 import { open, openMemory, openSQLite } from '../src/index'
 import { cosineSimilarity, serializeVector, deserializeVector } from '../src/embedding-store'
 import type { LimbicDB, Embedder, RecallResult } from '../src/types'
@@ -86,7 +87,8 @@ async function waitForMode(
 
 // Helper to create a temporary .limbic file path
 function tempLimbicPath(prefix = 'limbicdb-test-'): string {
-  return `/tmp/${prefix}${Date.now()}-${Math.random().toString(36).substring(2)}.limbic`
+  const tmpDir = os.tmpdir()
+  return `${tmpDir}/${prefix}${Date.now()}-${Math.random().toString(36).substring(2)}.limbic`
 }
 
 describeWithBackends('LimbicDB Semantic Search Tests', (createDb) => {
