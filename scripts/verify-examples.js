@@ -30,7 +30,7 @@ async function test() {
     await memory.remember("User is allergic to nuts")
     await memory.remember("Project deadline is Friday")
     
-    const result = await memory.recall("allergies")
+    const result = await memory.recall("allergic")
     console.log("Basic test passed:", result.memories.length > 0)
     if (result.memories.length === 0) {
       throw new Error("No memories found")
