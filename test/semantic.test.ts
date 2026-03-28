@@ -64,7 +64,7 @@ const failingEmbedder: Embedder = {
   dimensions: 384
 }
 
-// Helper function to wait for embeddings to be ready and a specific mode to execute
+// Helper to wait for embeddings to be ready and semantic/hybrid mode to execute
 async function waitForMode(
   db: LimbicDB,
   query: string,
@@ -81,6 +81,8 @@ async function waitForMode(
   }
   throw new Error(`Timed out waiting for ${mode} execution`)
 }
+
+
 
 // Helper to create a temporary .limbic file path
 function tempLimbicPath(prefix = 'limbicdb-test-'): string {
