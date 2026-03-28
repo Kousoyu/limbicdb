@@ -11,8 +11,9 @@ jobs:
   test:
     runs-on: ubuntu-latest
     strategy:
+      fail-fast: false
       matrix:
-        node-version: [18.x, 20.x, 22.x]
+        node-version: [20.x, 22.x, 24.x]
     
     steps:
     - uses: actions/checkout@v4
@@ -39,14 +40,14 @@ jobs:
       run: |
         # Test that the main README examples work
         echo "Testing semantic-recall example..."
-        npx tsx examples/semantic-recall.ts || echo "Warning: semantic-recall.ts may require manual embedder setup"
+        npx tsx examples/semantic-recall.ts 
         
         echo "Testing durable-semantic-snapshot example..."
-        npx tsx examples/durable-semantic-snapshot.ts || echo "Warning: durable-semantic-snapshot.ts may leave test files"
+        npx tsx examples/durable-semantic-snapshot.ts 
         
         echo "Testing basic usage example..."
         # Create a simple test script based on README basic usage
-        cat > test-basic.js << 'EOF'
+
         cat > test-basic.js << "EOF"
         import { open } from "./dist/index.js"
         import { rmSync } from "node:fs"
@@ -101,8 +102,8 @@ jobs:
         PACKAGE_VERSION=$(node -p "require('./package.json').version")
         echo "Package version: $PACKAGE_VERSION"
         
-        # Check if CHANGELOG has this version
-        if grep -q "## $PACKAGE_VERSION" CHANGELOG.md; then
+        # Check if CHANGELOG has this version (supports both formats)
+        if grep -q "\[$PACKAGE_VERSION\]" CHANGELOG.md || grep -q "## $PACKAGE_VERSION" CHANGELOG.md; then
           echo "✓ CHANGELOG contains version $PACKAGE_VERSION"
         else
           echo "✗ CHANGELOG missing version $PACKAGE_VERSION"
