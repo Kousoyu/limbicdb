@@ -6,9 +6,19 @@ import { cosineSimilarity, serializeVector, deserializeVector } from '../src/emb
 import type { LimbicDB, Embedder, RecallResult } from '../src/types'
 
 // Helper to run tests with both backends
-function describeWithBackends(name: string, fn: (createDb: () => Promise<LimbicDB>) => void) {
+// Now provides both createDb (no embedder) and createDbWithEmbedder (with mock embedder)
+function describeWithBackends(
+  name: string, 
+  fn: (options: {
+    createDb: () => Promise<LimbicDB>,
+    createDbWithEmbedder: () => Promise<LimbicDB>
+  }) => void
+) {
   describe(`${name} (memory backend)`, () => {
-    fn(async () => openMemory(':memory:'))
+    fn({
+      createDb: async () => openMemory(':memory:'),
+      createDbWithEmbedder: async () => open({ path: ':memory:', embedder: createMockEmbedder() })
+    })
   })
 
   describe(`${name} (SQLite backend - durable path)`, () => {
@@ -26,11 +36,17 @@ function describeWithBackends(name: string, fn: (createDb: () => Promise<LimbicD
       tempFiles.length = 0
     })
     
-    fn(async () => {
-      const path = tempLimbicPath()
-      tempFiles.push(path)
-      const db = openSQLite(path)
-      return db
+    fn({
+      createDb: async () => {
+        const path = tempLimbicPath()
+        tempFiles.push(path)
+        return openSQLite(path)
+      },
+      createDbWithEmbedder: async () => {
+        const path = tempLimbicPath()
+        tempFiles.push(path)
+        return open({ path, embedder: createMockEmbedder() })
+      }
     })
   })
 }
@@ -91,17 +107,14 @@ function tempLimbicPath(prefix = 'limbicdb-test-'): string {
   return `${tmpDir}/${prefix}${Date.now()}-${Math.random().toString(36).substring(2)}.limbic`
 }
 
-describeWithBackends('LimbicDB Semantic Search Tests', (createDb) => {
+describeWithBackends('LimbicDB Semantic Search Tests', ({ createDb, createDbWithEmbedder }) => {
   let db: LimbicDB
   let dbWithEmbedder: LimbicDB
 
   beforeEach(async () => {
     db = await createDb()
-    // For tests needing embedder, create with embedder in config
-    // This uses the public API: open({ path: path, embedder: mockEmbedder })
-    const mock = createMockEmbedder()
-    dbWithEmbedder = await createDb()
-    // Note: Some tests may need to re-open with embedder
+    // Use the dedicated creator for databases with embedder
+    dbWithEmbedder = await createDbWithEmbedder()
   })
 
   afterEach(async () => {
