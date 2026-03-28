@@ -72,6 +72,7 @@ jobs:
           process.exit(1)
         })
         EOF
+        node test-basic.js
     
     - name: Verify package
       run: npm run verify
