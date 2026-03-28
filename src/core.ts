@@ -238,34 +238,49 @@ export class LimbicDBImpl implements LimbicDB {
     
     // Determine actual mode based on embedder availability
     const executedMode: RecallMode = this.determineActualMode(requestedMode)
-    const fallback = (requestedMode === 'semantic' || requestedMode === 'hybrid') && executedMode === 'keyword'
+    let fallback = (requestedMode === 'semantic' || requestedMode === 'hybrid') && executedMode === 'keyword'
     
     let memories: Memory[] = []
     let embedMs = 0
+    let finalExecutedMode = executedMode
     
-    if (executedMode === 'keyword') {
-      memories = await this.executeKeywordRecall(query, options)
-    } else if (executedMode === 'semantic') {
-      const result = await this.executeSemanticRecall(query, options)
-      memories = result.memories
-      embedMs = result.embedMs
-    } else if (executedMode === 'hybrid') {
-      const result = await this.executeHybridRecall(query, options)
-      memories = result.memories
-      embedMs = result.embedMs
+    try {
+      if (executedMode === 'keyword') {
+        memories = await this.executeKeywordRecall(query, options)
+      } else if (executedMode === 'semantic') {
+        const result = await this.executeSemanticRecall(query, options)
+        memories = result.memories
+        embedMs = result.embedMs
+      } else if (executedMode === 'hybrid') {
+        const result = await this.executeHybridRecall(query, options)
+        memories = result.memories
+        embedMs = result.embedMs
+      }
+    } catch (err) {
+      // Query embedding failed - fall back to keyword search
+      if (executedMode === 'semantic' || executedMode === 'hybrid') {
+        memories = await this.executeKeywordRecall(query, options)
+        finalExecutedMode = 'keyword'
+        fallback = true
+        // Use the embed time up to the point of failure
+        embedMs = Date.now() - startTime
+      } else {
+        // Re-throw if it wasn't a semantic/hybrid mode
+        throw err
+      }
     }
     
     const searchMs = Date.now() - startTime
     
     // Record access event
-    this.recordTimelineEvent('memory', 'access', undefined, `Recalled: "${query.substring(0, 50)}" (${executedMode})`)
+    this.recordTimelineEvent('memory', 'access', undefined, `Recalled: "${query.substring(0, 50)}" (${finalExecutedMode})`)
     
     return {
       memories,
       meta: {
         requestedMode,
-        executedMode,
-        mode: executedMode, // Alias for backward compatibility
+        executedMode: finalExecutedMode,
+        mode: finalExecutedMode, // Alias for backward compatibility
         fallback,
         pendingEmbeddings: this.pendingEmbeddings,
         timing: {

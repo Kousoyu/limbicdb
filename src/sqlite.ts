@@ -287,18 +287,33 @@ export class LimbicDBSQLite implements LimbicDB {
     
     let memories: Memory[] = []
     let embedMs = 0
+    let actualExecutedMode = finalExecutedMode
     
-    // Execute appropriate recall based on mode
-    if (finalExecutedMode === 'keyword') {
-      memories = await this.executeKeywordRecall(query, options, startTime)
-    } else if (finalExecutedMode === 'semantic') {
-      const result = await this.executeSemanticRecall(query, options, startTime)
-      memories = result.memories
-      embedMs = result.embedMs
-    } else if (finalExecutedMode === 'hybrid') {
-      const result = await this.executeHybridRecall(query, options, startTime)
-      memories = result.memories
-      embedMs = result.embedMs
+    try {
+      // Execute appropriate recall based on mode
+      if (finalExecutedMode === 'keyword') {
+        memories = await this.executeKeywordRecall(query, options, startTime)
+      } else if (finalExecutedMode === 'semantic') {
+        const result = await this.executeSemanticRecall(query, options, startTime)
+        memories = result.memories
+        embedMs = result.embedMs
+      } else if (finalExecutedMode === 'hybrid') {
+        const result = await this.executeHybridRecall(query, options, startTime)
+        memories = result.memories
+        embedMs = result.embedMs
+      }
+    } catch (err) {
+      // Query embedding failed - fall back to keyword search
+      if (finalExecutedMode === 'semantic' || finalExecutedMode === 'hybrid') {
+        memories = await this.executeKeywordRecall(query, options, startTime)
+        actualExecutedMode = 'keyword'
+        fallback = true
+        // Use the embed time up to the point of failure
+        embedMs = Date.now() - startTime
+      } else {
+        // Re-throw if it wasn't a semantic/hybrid mode
+        throw err
+      }
     }
     
     const searchMs = Date.now() - startTime
@@ -307,8 +322,8 @@ export class LimbicDBSQLite implements LimbicDB {
       memories,
       meta: {
         requestedMode,
-        executedMode: finalExecutedMode,
-        mode: finalExecutedMode, // Alias for backward compatibility
+        executedMode: actualExecutedMode,
+        mode: actualExecutedMode, // Alias for backward compatibility
         fallback,
         pendingEmbeddings: this._pendingEmbeddings,
         timing: {
