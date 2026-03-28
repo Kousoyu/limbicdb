@@ -47,29 +47,30 @@ jobs:
         echo "Testing basic usage example..."
         # Create a simple test script based on README basic usage
         cat > test-basic.js << 'EOF'
-        import { open } from './dist/index.js'
+        cat > test-basic.js << "EOF"
+        import { open } from "./dist/index.js"
+        import { rmSync } from "node:fs"
         
         async function test() {
-          const memory = open('./test-basic.limbic')
+          const memory = open("./test-basic.limbic")
           try {
-            await memory.remember('User is allergic to nuts')
-            await memory.remember('Project deadline is Friday')
+            await memory.remember("User is allergic to nuts")
+            await memory.remember("Project deadline is Friday")
             
-            const context = await memory.recall('allergies')
-            console.log('Basic test passed:', context.memories.length > 0)
+            const result = await memory.recall("allergies")
+            console.log("Basic test passed:", result.memories.length > 0)
           } finally {
             await memory.close()
             // Clean up test file
-            try { require('fs').unlinkSync('./test-basic.limbic') } catch {}
+            try { rmSync("./test-basic.limbic", { force: true }) } catch {}
           }
         }
         
         test().catch(err => {
-          console.error('Basic test failed:', err)
+          console.error("Basic test failed:", err)
           process.exit(1)
         })
         EOF
-        node test-basic.js
     
     - name: Verify package
       run: npm run verify

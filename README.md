@@ -144,7 +144,6 @@ Key topics covered:
 * ✅ **Auto-classification** - facts, episodes, preferences, procedures, goals
 * ✅ **State storage** - get/set for memory-adjacent state
 * ✅ **Timeline auditing** - full operation history
-* ✅ **Snapshots** - point-in-time restore (without embeddings)
 
 **In progress**:
 * 🔄 **Embedding storage** - basic integration complete
@@ -347,8 +346,8 @@ await memory.remember('User is allergic to nuts')
 await memory.remember('Project deadline is Friday')
 
 // Recall relevant context
-const context = await memory.recall('allergies')
-// → [{ content: 'User is allergic to nuts', strength: 0.85, kind: 'fact', ... }]
+const result = await memory.recall('allergies')
+// → { memories: [...], meta: { requestedMode: "keyword", executedMode: "keyword", fallback: false } }
 
 // Store memory-adjacent state (not runtime state)
 await memory.set('session_summary', {
