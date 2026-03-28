@@ -6,11 +6,11 @@ English | [简体中文](./README.zh-CN.md)
 
 Store what matters, recall it with context, and inspect why it was used — in a single local file.
 
-> **Current Status (v0.4.0-alpha.3)**: 
+> **Current Status (v1.0.0-beta.1)**: 
 > - **SQLite backend**: Keyword search (stable), semantic/hybrid search (experimental-mvp)
 > - **Memory backend**: Keyword search (stable), semantic/hybrid search (experimental, bring-your-own embedder)
-> - **Snapshot parity**: Embeddings included in snapshots (both backends, alpha feature)
-> - **Release discipline**: CI/CD, version consistency, example validation (alpha rigor)
+> - **Snapshot parity**: Embeddings included in snapshots (both backends, beta feature)
+> - **Release discipline**: CI/CD, version consistency, example validation (beta rigor)
 
 ## Backend Capability Matrix
 
