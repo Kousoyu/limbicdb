@@ -5,6 +5,43 @@ All notable changes to LimbicDB will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.0-beta.1] - 2026-03-29
+
+### 🎯 First Beta Release - Stable Core API
+This marks the first beta release with a stable core memory API, ready for integration into larger systems like CogniCore.
+
+### Fixed
+- **API consistency**: Fixed demo.ts to correctly use `results.memories` instead of assuming direct array return from `recall()`
+- **Documentation alignment**: Ensured all examples and documentation reflect the correct `RecallResult` return structure
+
+### Added
+- **Complete test coverage**: 109 passing tests covering both SQLite and memory backends
+- **Type safety**: Full TypeScript type definitions for all public APIs
+- **Build pipeline**: Verified npm package build and distribution
+
+### Core Features (Stable)
+- **Memory lifecycle**: Complete remember/recall/forget operations
+- **Auto-classification**: Automatic categorization into fact/episode/preference/procedure/goal
+- **Memory strength**: Decay-based strength model with access boosting
+- **Keyword search**: Stable FTS5 + LIKE fallback for English and basic CJK
+- **Persistence**: Single-file SQLite storage (`.limbic` format)
+- **Memory backend**: In-memory mode for development/testing
+- **Snapshots**: Point-in-time snapshot and restore capability
+- **Audit trail**: Complete operation timeline with full history
+
+### Experimental Features
+- **Semantic search**: Vector-based similarity search (requires user-provided embedder)
+- **Hybrid search**: Combined keyword + semantic scoring (70% semantic, 30% keyword)
+
+### Known Limitations
+- **CJK search**: Limited partial word matching for Chinese/Japanese/Korean characters
+- **Embedding dependency**: Semantic search requires external embedder implementation
+- **File format**: `.limbic` format may have minor changes during beta phase
+
+### Integration Ready
+- **cogni-core compatibility**: Ready for integration as memory backend in CogniCore runtime
+- **Simple API**: Minimal learning curve with consistent interface across backends
+
 ## [0.4.0-alpha.3] - 2026-03-28
 
 ### 🎯 Truthful Alpha Release (Release Discipline)

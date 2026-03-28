@@ -24,7 +24,7 @@ async function main() {
   // Recall memories
   console.log('\n2. Recalling memories about TypeScript...')
   const results = await db.recall('TypeScript')
-  results.forEach((mem, i) => {
+  results.memories.forEach((mem, i) => {
     console.log(`  ${i + 1}. [${mem.kind}] ${mem.content} (strength: ${mem.strength.toFixed(2)})`)
   })
   
