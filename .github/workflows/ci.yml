@@ -47,7 +47,6 @@ jobs:
         
         echo "Testing basic usage example..."
         # Create a simple test script based on README basic usage
-
         cat > test-basic.js << "EOF"
         import { open } from "./dist/index.js"
         import { rmSync } from "node:fs"
@@ -80,10 +79,128 @@ jobs:
     - name: Smoke test npm package
       run: npm run smoketest
   
+  test-runtime-compatibility:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        node-version: [18.x, 20.x, 22.x]
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Use Node.js ${{ matrix.node-version }}
+      uses: actions/setup-node@v4
+      with:
+        node-version: ${{ matrix.node-version }}
+        cache: 'npm'
+    
+    - name: Build and pack
+      run: |
+        npm ci
+        npm run build
+        npm pack
+    
+    - name: Test packaged tarball
+      run: |
+        # Create clean environment
+        mkdir -p /tmp/test-runtime
+        cd /tmp/test-runtime
+        npm init -y
+        
+        # Install the tarball (from workspace root)
+        npm install "$GITHUB_WORKSPACE"/limbicdb-*.tgz
+        
+        # Test that the package works
+        cat > test-runtime.js << 'EOF'
+        const { open } = require('limbicdb')
+        const { rmSync } = require('node:fs')
+        
+        async function test() {
+          const testFile = './runtime-test.limbic'
+          const testContent = 'Runtime compatibility test - ' + Date.now()
+          
+          // Phase 1: Write data
+          const memory1 = open(testFile)
+          try {
+            await memory1.remember(testContent)
+            const result1 = await memory1.recall('compatibility')
+            console.log('Phase 1 - Write passed:', result1.memories.length > 0)
+          } finally {
+            await memory1.close()
+          }
+          
+          // Phase 2: Reopen and verify persistence
+          const memory2 = open(testFile)
+          try {
+            const result2 = await memory2.recall('compatibility')
+            const found = result2.memories.some(mem => mem.content.includes('Runtime compatibility test'))
+            console.log('Phase 2 - Persistence verified:', found)
+            if (!found) {
+              throw new Error('Data not persisted after reopen')
+            }
+            console.log('Runtime test passed for Node.js', process.version)
+          } finally {
+            await memory2.close()
+            try { rmSync(testFile, { force: true }) } catch {}
+          }
+        }
+        
+        test().catch(err => {
+          console.error('Runtime test failed:', err)
+          process.exit(1)
+        })
+        EOF
+        node test-runtime.js
+    
+    - name: Test ESM import
+      run: |
+        cd /tmp/test-runtime
+        cat > test-runtime-esm.mjs << 'EOF'
+        import { open } from 'limbicdb'
+        import { rmSync } from 'node:fs'
+        
+        async function test() {
+          const testFile = './runtime-test-esm.limbic'
+          const testContent = 'ESM runtime test - ' + Date.now()
+          
+          // Phase 1: Write data
+          const memory1 = open(testFile)
+          try {
+            await memory1.remember(testContent)
+            const result1 = await memory1.recall('runtime')
+            console.log('Phase 1 - Write passed:', result1.memories.length > 0)
+          } finally {
+            await memory1.close()
+          }
+          
+          // Phase 2: Reopen and verify persistence
+          const memory2 = open(testFile)
+          try {
+            const result2 = await memory2.recall('runtime')
+            const found = result2.memories.some(mem => mem.content.includes('ESM runtime test'))
+            console.log('Phase 2 - Persistence verified:', found)
+            if (!found) {
+              throw new Error('Data not persisted after reopen')
+            }
+            console.log('ESM runtime test passed for Node.js', process.version)
+          } finally {
+            await memory2.close()
+            try { rmSync(testFile, { force: true }) } catch {}
+          }
+        }
+        
+        test().catch(err => {
+          console.error('ESM runtime test failed:', err)
+          process.exit(1)
+        })
+        EOF
+        node test-runtime-esm.mjs
+
   publish-check:
     runs-on: ubuntu-latest
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-    needs: test
+    needs: [test, test-runtime-compatibility]
     
     steps:
     - uses: actions/checkout@v4
