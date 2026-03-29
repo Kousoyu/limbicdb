@@ -1,6 +1,6 @@
 {
   "name": "limbicdb",
-  "version": "1.0.0-beta.1",
+  "version": "1.0.0",
   "description": "Local-first memory engine for embedded agents. Durable, inspectable, and one-file by default.",
   "keywords": [
     "ai",
