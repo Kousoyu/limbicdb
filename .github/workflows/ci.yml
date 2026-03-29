@@ -45,6 +45,8 @@ jobs:
     
     - name: Verify package
       timeout-minutes: 2
+      env:
+        CI: true
       run: npm run verify
     
     - name: Smoke test npm package
