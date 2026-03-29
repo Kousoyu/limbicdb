@@ -33,7 +33,7 @@ This marks the first stable release of LimbicDB, ready for production use as a l
 ## [1.0.0-beta.1] - 2026-03-29
 
 ### 🎯 First Beta Release - Stable Core API
-This marks the first beta release with a stable core memory API, ready for integration into larger systems like CogniCore.
+This marks the first beta release with a stable core memory API, ready for integration into larger systems like Cerebria.
 
 ### Fixed
 - **API consistency**: Fixed demo.ts to correctly use `results.memories` instead of assuming direct array return from `recall()`
@@ -64,7 +64,7 @@ This marks the first beta release with a stable core memory API, ready for integ
 - **File format**: `.limbic` format may have minor changes during beta phase
 
 ### Integration Ready
-- **cogni-core compatibility**: Ready for integration as memory backend in CogniCore runtime
+- **cerebria compatibility**: Ready for integration as memory backend in Cerebria runtime
 - **Simple API**: Minimal learning curve with consistent interface across backends
 
 ## [0.4.0-alpha.3] - 2026-03-28
@@ -245,7 +245,7 @@ The goal is to collect real-world feedback while maintaining clear boundaries ab
 ### Breaking Changes
 - **Public positioning shifted** from "cognitive science narrative" to "local-first memory engine"
 - **README completely rewritten** to emphasize practical engineering over marketing promises
-- **Relationship to CogniCore clarified**: LimbicDB is the memory engine, CogniCore is the runtime orchestration layer
+- **Relationship to Cerebria clarified**: LimbicDB is the memory engine, Cerebria is the runtime orchestration layer
 
 ### Added
 - **Comprehensive contract tests** (`test/contract.test.ts`): 34 tests defining semantic behavior for:

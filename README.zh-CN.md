@@ -232,17 +232,17 @@ LimbicDB 不是向量数据库。它是一个记忆生命周期引擎。
 
 > 我们宁愿你选择正确的工具,而不是选择我们。如果 LimbicDB 不适合你的情况,这些替代方案确实是很好的选择。
 
-## 与 CogniCore 的关系
+## 与 Cerebria 的关系
 
 LimbicDB 负责 **memory**。
-CogniCore 负责 **runtime orchestration、governance 和 recovery**。
+Cerebria 负责 **runtime orchestration、governance 和 recovery**。
 
 两者一起使用时:
 
-* **CogniCore** 决定 Agent 如何运行
+* **Cerebria** 决定 Agent 如何运行
 * **LimbicDB** 决定记忆如何存储、召回和维护
 
-**重要:** LimbicDB 和 CogniCore 是**独立的、版本独立**的项目。你可以在没有 CogniCore 的情况下使用 LimbicDB,反之亦然。
+**重要:** LimbicDB 和 Cerebria 是**独立的、版本独立**的项目。你可以在没有 Cerebria 的情况下使用 LimbicDB,反之亦然。
 
 ---
 

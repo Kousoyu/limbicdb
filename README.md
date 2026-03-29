@@ -231,17 +231,17 @@ This table helps you decide if it fits your use case.
 
 > We'd rather you pick the right tool than pick us. If LimbicDB isn't right for your case, these alternatives are genuinely good.
 
-## Relationship to CogniCore
+## Relationship to Cerebria
 
 LimbicDB focuses on **memory**.
-CogniCore focuses on **runtime orchestration, governance, and recovery**.
+Cerebria focuses on **runtime orchestration, governance, and recovery**.
 
 If you use both together:
 
-* **CogniCore** decides how the agent runs
+* **Cerebria** decides how the agent runs
 * **LimbicDB** decides how memory is stored, recalled, and maintained
 
-**Important:** LimbicDB and CogniCore are **separate, independently versioned projects**. You can use LimbicDB without CogniCore, and vice versa.
+**Important:** LimbicDB and Cerebria are **separate, independently versioned projects**. You can use LimbicDB without Cerebria, and vice versa.
 
 ---
 
