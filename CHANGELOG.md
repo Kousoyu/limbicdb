@@ -5,6 +5,31 @@ All notable changes to LimbicDB will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.0] - 2026-03-29
+
+### 🎉 First Stable Release - Production Ready
+This marks the first stable release of LimbicDB, ready for production use as a local-first memory engine for AI agents.
+
+### Added
+- **Production-ready stability**: All core APIs stabilized and thoroughly tested
+- **Complete CI/CD pipeline**: Full test coverage with GitHub Actions validation
+- **Professional documentation**: Comprehensive README with usage examples
+- **npm package**: Published as `limbicdb@1.0.0` on npm registry
+- **Dual backend support**: Memory and SQLite backends both production-ready
+- **Semantic search**: Vector-based similarity search with graceful degradation
+- **Snapshot/restore**: Point-in-time backup and recovery capability
+
+### Changed
+- **Version promotion**: Promoted from beta to stable (1.0.0-beta.1 → 1.0.0)
+- **API stability**: Core memory API now considered stable for production use
+- **Performance optimization**: Optimized for production workloads
+- **Error handling**: Improved robustness and error reporting
+
+### Fixed
+- **CI/CD reliability**: Resolved native module compilation issues in GitHub Actions
+- **Version consistency**: Aligned package.json, CHANGELOG, and README versions
+- **Build validation**: Enhanced smoketest to ensure clean package distribution
+
 ## [1.0.0-beta.1] - 2026-03-29
 
 ### 🎯 First Beta Release - Stable Core API
