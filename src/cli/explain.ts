@@ -3,9 +3,20 @@
 import { open } from '../index';
 
 async function main() {
-  const args = process.argv.slice(2);
+  // Parse arguments properly
+  const args = [];
+  let jsonOutput = false;
+  
+  for (let i = 2; i < process.argv.length; i++) {
+    if (process.argv[i] === '--json') {
+      jsonOutput = true;
+    } else {
+      args.push(process.argv[i]);
+    }
+  }
+  
   if (args.length === 0) {
-    console.log('Usage: limbic explain <query>');
+    console.log('Usage: limbic explain <query> [--json]');
     process.exit(1);
   }
   
@@ -18,18 +29,20 @@ async function main() {
     
     // For now, we'll simulate the explain functionality
     // In a real implementation, this would call the MemoryExplain class
-    console.log(`🔍 Explanation for: "${query}"\n`);
-    console.log('This is a placeholder for the explain functionality.');
-    console.log('In Phase 1, we need to implement the actual explain logic.');
-    console.log('');
-    console.log('Decision trace:');
-    console.log('  • retrieved memories from database');
-    console.log('  • filtered relevant memories');
-    console.log('  • applied keyword matching');
-    console.log('  • detected conflicts (if any)');
+    if (!jsonOutput) {
+      console.log(`🔍 Explanation for: "${query}"\n`);
+      console.log('This is a placeholder for the explain functionality.');
+      console.log('In Phase 1, we need to implement the actual explain logic.');
+      console.log('');
+      console.log('Decision trace:');
+      console.log('  • retrieved memories from database');
+      console.log('  • filtered relevant memories');
+      console.log('  • applied keyword matching');
+      console.log('  • detected conflicts (if any)');
+    }
     
-    // Check for JSON output flag
-    if (process.argv.includes('--json')) {
+    // Always output JSON if requested
+    if (jsonOutput) {
       const result = {
         query,
         candidates: [],
@@ -41,7 +54,7 @@ async function main() {
           'detected conflicts (if any)'
         ]
       };
-      console.log('\n' + JSON.stringify(result, null, 2));
+      console.log(JSON.stringify(result, null, 2));
     }
     
   } catch (error: any) {

@@ -32,6 +32,7 @@ class Memory:
         """
         self.path = path
         self.limbicdb_path = limbicdb_path or os.environ.get('LIMBICDB_PATH', '.')
+        self.wrapper_script = os.path.join(self.limbicdb_path, "limbic-explain.sh")
         
         # Verify LimbicDB is available
         if not self._check_limbicdb_available():
@@ -64,8 +65,11 @@ class Memory:
         Raises:
             MemoryError: If CLI command fails
         """
-        # Build command
-        cmd = ["npm", "run", command, "--"] + args + ["--json"]
+        if command == "explain":
+            # Use wrapper script for better compatibility
+            cmd = [self.wrapper_script] + args
+        else:
+            raise NotImplementedError(f"Command {command} not implemented")
         
         try:
             result = subprocess.run(
@@ -73,7 +77,7 @@ class Memory:
                 cwd=self.limbicdb_path,
                 capture_output=True,
                 text=True,
-                timeout=30  # 30 second timeout
+                timeout=15
             )
             
             if result.returncode != 0:
