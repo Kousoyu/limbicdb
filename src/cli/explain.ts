@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 
-import { open } from '../index';
+import { MemoryExplain } from '../explain';
 
 async function main() {
   // Parse arguments properly
@@ -24,37 +24,41 @@ async function main() {
   const dbPath = './agent.limbic'; // Default path
   
   try {
-    // Open database 
-    const memory = open(dbPath);
+    const explainer = new MemoryExplain(dbPath);
+    const explanation = await explainer.explain(query);
     
-    // For now, we'll simulate the explain functionality
-    // In a real implementation, this would call the MemoryExplain class
     if (!jsonOutput) {
       console.log(`🔍 Explanation for: "${query}"\n`);
-      console.log('This is a placeholder for the explain functionality.');
-      console.log('In Phase 1, we need to implement the actual explain logic.');
-      console.log('');
+      
+      if (explanation.candidates.length === 0) {
+        console.log('No relevant memories found.');
+      } else {
+        console.log('Found matching memories:\n');
+        
+        explanation.candidates.forEach((candidate, index) => {
+          console.log(`${index + 1}. "${candidate.memory.content}"`);
+          console.log(`   Score: ${candidate.score.toFixed(3)}`);
+          console.log(`   Reasons: ${candidate.reasons.join(', ')}`);
+          
+          const date = new Date(candidate.memory.createdAt || Date.now());
+          console.log(`   Created: ${date.toLocaleDateString()} ${date.toLocaleTimeString()}`);
+          console.log('');
+        });
+        
+        if (explanation.conflicts) {
+          console.log('⚠️  Conflict detected between memories\n');
+        }
+      }
+      
       console.log('Decision trace:');
-      console.log('  • retrieved memories from database');
-      console.log('  • filtered relevant memories');
-      console.log('  • applied keyword matching');
-      console.log('  • detected conflicts (if any)');
+      explanation.decisionTrace.forEach(step => {
+        console.log(`  • ${step}`);
+      });
     }
     
     // Always output JSON if requested
     if (jsonOutput) {
-      const result = {
-        query,
-        candidates: [],
-        conflicts: false,
-        decisionTrace: [
-          'retrieved memories from database',
-          'filtered relevant memories', 
-          'applied keyword matching',
-          'detected conflicts (if any)'
-        ]
-      };
-      console.log(JSON.stringify(result, null, 2));
+      console.log(JSON.stringify(explanation, null, 2));
     }
     
   } catch (error: any) {
