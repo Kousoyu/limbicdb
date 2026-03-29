@@ -31,10 +31,16 @@ def main():
         print("3. Set LIMBICDB_PATH environment variable (optional)")
         return
     
+    # Test remember
+    print("\n📝 Adding memories:")
+    memory.remember("User loves Python")
+    memory.remember("User hates Python")
+    print("✓ Added conflicting memories")
+    
     # Explain memory retrieval
-    print("\n🔍 Explaining memory retrieval for 'anime':")
+    print("\n🔍 Explaining memory retrieval for 'Python':")
     try:
-        explanation = memory.explain("anime")
+        explanation = memory.explain("Python")
         print(f"Query: {explanation.get('query', 'N/A')}")
         print(f"Conflicts: {explanation.get('conflicts', False)}")
         
@@ -53,6 +59,39 @@ def main():
             
     except Exception as e:
         print(f"✗ Error explaining memory: {e}")
+    
+    # Test search
+    print("\n🔎 Searching memories:")
+    try:
+        search_result = memory.search("Python")
+        results = search_result.get('results', [])
+        print(f"Found {len(results)} memories")
+        for result in results[:2]:
+            print(f"  • {result.get('content', 'N/A')}")
+    except Exception as e:
+        print(f"✗ Error searching: {e}")
+    
+    # Test timeline
+    print("\n🕒 Getting timeline:")
+    try:
+        timeline_result = memory.timeline("Python")
+        memories = timeline_result.get('memories', [])
+        print(f"Timeline has {len(memories)} entries")
+        for mem in memories[:2]:
+            print(f"  • {mem.get('content', 'N/A')}")
+    except Exception as e:
+        print(f"✗ Error getting timeline: {e}")
+    
+    # Test forget
+    print("\n🗑️  Forgetting memories:")
+    try:
+        forget_result = memory.forget("User hates Python")
+        if forget_result.get('success'):
+            print("✓ Successfully forgot 'User hates Python'")
+        else:
+            print(f"✗ Failed to forget: {forget_result.get('error', 'Unknown error')}")
+    except Exception as e:
+        print(f"✗ Error forgetting: {e}")
 
 if __name__ == "__main__":
     main()

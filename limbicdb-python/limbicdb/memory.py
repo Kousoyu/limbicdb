@@ -32,7 +32,6 @@ class Memory:
         """
         self.path = path
         self.limbicdb_path = limbicdb_path or os.environ.get('LIMBICDB_PATH', '.')
-        self.wrapper_script = os.path.join(self.limbicdb_path, "limbic-explain.sh")
         
         # Verify LimbicDB is available
         if not self._check_limbicdb_available():
@@ -65,11 +64,8 @@ class Memory:
         Raises:
             MemoryError: If CLI command fails
         """
-        if command == "explain":
-            # Use wrapper script for better compatibility
-            cmd = [self.wrapper_script] + args
-        else:
-            raise NotImplementedError(f"Command {command} not implemented")
+        # Build command - use npm run for better compatibility
+        cmd = ["npm", "run", command, "--"] + args + ["--json"]
         
         try:
             result = subprocess.run(
@@ -77,7 +73,7 @@ class Memory:
                 cwd=self.limbicdb_path,
                 capture_output=True,
                 text=True,
-                timeout=15
+                timeout=20  # 20 second timeout
             )
             
             if result.returncode != 0:
@@ -107,8 +103,9 @@ class Memory:
             Dictionary containing explanation with structure:
             {
                 "query": str,
+                "selectedMemory": Memory object or None,
                 "candidates": List[{
-                    "memory": {"content": str, "strength": float, ...},
+                    "memory": Memory object,
                     "score": float,
                     "reasons": List[str]
                 }],
@@ -118,39 +115,50 @@ class Memory:
         """
         return self._run_cli("explain", [query])
     
-    def add(self, content: str, type: str = "fact", strength: float = 1.0, 
-            metadata: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+    def remember(self, content: str) -> Dict[str, Any]:
         """
         Add memory to database
         
-        Note: This is a placeholder. Actual implementation would require
-        a 'remember' CLI command to be added to LimbicDB.
+        Args:
+            content: Memory content to store
+            
+        Returns:
+            Dictionary with success status and content
         """
-        raise NotImplementedError("Add functionality requires 'remember' CLI command")
+        return self._run_cli("remember", [content])
     
-    def search(self, query: str, top_k: int = 5) -> List[Dict[str, Any]]:
+    def search(self, query: str) -> Dict[str, Any]:
         """
         Search memories by query
         
-        Note: This is a placeholder. Actual implementation would require
-        a 'search' CLI command to be added to LimbicDB.
+        Args:
+            query: Search query
+            
+        Returns:
+            Dictionary containing query and results list
         """
-        raise NotImplementedError("Search functionality requires 'search' CLI command")
+        return self._run_cli("search", [query])
     
-    def timeline(self, query: str) -> List[Dict[str, Any]]:
+    def timeline(self, query: str) -> Dict[str, Any]:
         """
         Get memory timeline for query
         
-        Note: This is a placeholder. Actual implementation would require
-        a 'timeline' CLI command to be added to LimbicDB.
+        Args:
+            query: Query to filter timeline
+            
+        Returns:
+            Dictionary containing query and memories list
         """
-        raise NotImplementedError("Timeline functionality requires 'timeline' CLI command")
+        return self._run_cli("timeline", [query])
     
-    def forget(self, content: str) -> bool:
+    def forget(self, content: str) -> Dict[str, Any]:
         """
         Remove memory from database
         
-        Note: This is a placeholder. Actual implementation would require
-        a 'forget' CLI command to be added to LimbicDB.
+        Args:
+            content: Memory content to delete
+            
+        Returns:
+            Dictionary with success status and deletion count
         """
-        raise NotImplementedError("Forget functionality requires 'forget' CLI command")
+        return self._run_cli("forget", [content])
