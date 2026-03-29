@@ -39,6 +39,7 @@
     "build": "tsup src/index.ts --format cjs,esm --dts --clean",
     "dev": "tsup src/index.ts --format esm --watch",
     "demo": "tsx demo.ts",
+    "explain": "tsx src/cli/explain.ts",
     "verify": "node scripts/verify.js",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
