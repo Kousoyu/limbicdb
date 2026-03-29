@@ -50,7 +50,11 @@
     "check:docs": "node scripts/check-docs-consistency.js",
     "verify:public-contracts": "tsx scripts/verify-public-contracts.js",
     "release:check": "node scripts/release-check.js",
-    "prepublishOnly": "npm run smoketest && npm run release:check"
+    "prepublishOnly": "npm run smoketest && npm run release:check",
+    "remember": "tsx src/cli/remember.ts",
+    "search": "tsx src/cli/search.ts",
+    "timeline": "tsx src/cli/timeline.ts",
+    "forget": "tsx src/cli/forget.ts"
   },
   "dependencies": {
     "better-sqlite3": "^11.0.0"
