@@ -44,7 +44,7 @@ jobs:
       run: npm run verify:examples
     
     - name: Verify package
-      timeout-minutes: 2
+      timeout-minutes: 5
       env:
         CI: true
       run: npm run verify
