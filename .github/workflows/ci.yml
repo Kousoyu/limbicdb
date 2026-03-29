@@ -40,12 +40,15 @@ jobs:
       run: npm run build
     
     - name: Verify examples
+      timeout-minutes: 2
       run: npm run verify:examples
     
     - name: Verify package
+      timeout-minutes: 2
       run: npm run verify
     
     - name: Smoke test npm package
+      timeout-minutes: 2
       run: npm run smoketest
   
   test-runtime-compatibility:
